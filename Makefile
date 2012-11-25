@@ -16,7 +16,7 @@ $(TARGET2):$(TARGET) Doxyfile
 $(OBJ): cv_templates.hh
 
 cv_templates.hh: cv_templates.cc
-	@-touch cv.cc
+	@-touch cv.cc dynan.cc conf.cc
 hist.o: hist.hh hist.cc
 dynan.o:dynan.hh dynan.cc
 sketch.o:sketch.hh sketch.cc
