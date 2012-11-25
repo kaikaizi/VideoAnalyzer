@@ -1,0 +1,428 @@
+.\"    Copyright (C) 2012  Liu Lukai	(liulukai@gmail.com)
+.\"    This file is the manual of VideoAnalyzer.
+
+.\"    VideoAnalyzer is free software: you can redistribute it and/or modify
+.\"    it under the terms of the GNU General Public License as published by
+.\"    the Free Software Foundation, either version 3 of the License, or
+.\"    (at your option) any later version.
+
+.\"    This program is distributed in the hope that it will be useful,
+.\"    but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"    GNU General Public License for more details.
+
+.\"    You should have received a copy of the GNU General Public License
+.\"    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+.\" Manpage for VideoAnalyzer
+
+.TH man 1 "Nov 2012" "version 1.0" "VideoAnalyzer man page"
+
+.SH NAME
+VideoAnalyzer \- Analyze performance degradation of medical video transmission
+
+.SH SYNOPSIS
+.B
+.sp
+.BI "" VideoAnalyzer " [-c/--compare " primary " " transmitted "] [-C/--conf " configname "] [-d/--diff-mode " n "]"
+.br
+.BI "[-g/--gen-conf] [-G/--gen-video] [-p/--prepend] [-r/--register " reference "] [-v/--verbose]"
+.br
+.BI "[--simulate] " Video
+.sp
+.in -4n
+
+.SH DESCRIPTION
+.BR VideoAnalyzer
+is a simple medical video analyzing program that evaluates performance degradation via transmission in telemedicine,
+such as a remote ultrasonic scan on patient side which is transmitted under various conditions to a hostpital.
+This program offers no function for tranmitting/receiving over ethernet.
+.PP
+Only audio-video interleave (AVI) format is supported.
+.PP
+Program arguments specify the 
+.I modes/commands
+of operation, and the fine-tuning method parameters are listed in the 
+.I configuration
+file that accompanies.
+
+.SH TERMINOLOGY
+.I "transmitted, received"
+.sp
+Video pairs under comparison. In the evaluation model, video A is transmitted from terminal T1 via ethernet/satellite signal to terminal T2, where it is captured and saved to video B. Video A is called 'transmitted video', or 'primary video' and is treated as ground truth, and video B called 'received video', or 'secondary video'. Video quality degradation is defined to be difference between these two videos.
+.PP
+In a typical senario, a video is first prepared by inserting a number of 'reference' frames in the beginning, and then
+it is played in the 'transmitter' end via some third-party remote conference system, where the 'receiver' at the other end of
+conference system receives the video playback. In the receiver end, the playback is recaptured (here the term 'recapture'
+refers to PC screen capture and saving to a new video file) using some third-party video capturing software to save to a
+new video. Depending on the video codec of the conference system under question, the local video playback may already
+introduce some serious quality degradations. In this case, the local playback is also recaptured and stored, preferrably
+simultaneously with 'receiver' recapturing. The two recaputred videos are then registered with original video to keep a
+single repetition, and the video quality degradation is evaluated using this program. Possible sources of video degradation
+includes video compression video recapturing and lossy transmission, but it is believed that using abovesaid protocol,
+degradation transmission plays a most important part.
+.sp
+.I "transform domain"
+.sp
+A two-dimensional signal (image) in spatial domain is transformed into a different domain. Information of the signal is equally preserved in both domains, but one domain may be superior to the other in presenting certain features of the signal. In this study, the 2D discrete Fourier transform, discrete Cosine transform and discrete wavelet transform are adopted.
+.sp
+.I p-norm
+.sp
+A measure of finite-dimensional Lebesgue vector spaces L**p. For vector
+.B x
+in k-dimension, its p-norm (p>0, integer) is defined as:
+.B "||x||p={Sum (|xi|**p) over i from 1 to k}**(1/p)"
+, where
+.B xi
+is its projection on i-th dimension. Define the inf-norm as:
+.B "||x||inf=max{|xi|, i from 1 to k}"
+The p-norm is decreasing as a function of p.
+
+.SH OPTIONS
+.BI "-c, --compare " primary " " transmitted
+.br
+Performs side-by-side frame-wise comparison between two videos: 
+.I primary
+video (on the sender's end) and
+.I transmitted
+video (on the receiver's end). Details concerning frame-wise registration and identical frame removal is specified in the
+.I "Frame Register Settings"
+section of the configuration file.
+.PP
+.BI "-C, --conf " configname
+.br
+Specifies the configuration file to be used. Defaults to 
+.I "VideoAnalyzer.conf"
+under the same directory of this program path or home directory.
+.PP
+.BI "-d, --diff-mode " n
+.br
+Video self-check in difference mode. In this mode, a single video file is treated as 
+.I primary
+and
+.I transmitted
+videos as
+.BI --compare
+mode, except that frame-wise registration is not used. The second capture of the video file starts from
+.I "n"
+\-th frame instead of first frame. This mode can be used to get the difference of two non-adjacent frames.
+.PP
+.BI "-g, --gen-conf"
+.br
+Generates default configuration file under current directory. It is user's responsibility to edit/move the configuration file to the program's conf search path.
+.PP
+.BI "-G, --gen-video"
+.br
+Generates a video clip from a image. Refer to
+.I "Self-testing Video-extension Settings"
+section of configuration for more detail.
+.PP
+.BI "-p, --prepend"
+.br
+Prepends a number of frames to a specified video and resave it. The 
+.B --prepend
+and
+.B --register
+options serve to identify the starting of a video under lossy transmission environment when playback. Before transmission, the video is prepared by prepending long enough frames. The captured video at the receiver's end is then registered using reference video as the original video before frame prepending.
+.PP
+.BI "-r, --register " reference
+.br
+Register a captured video playback with the reference video. At least one repetition of the whole video (or two prepended frame periods) are needed. The captured video 
+.I must
+have both frame dimensions (width, height) no less than the dimensions of reference video, and a guess of sub-region is used to crop the video when necessary. Only dimension information from reference video is used.
+.PP
+.BI "-v, --verbose"
+.br
+Verbose mode. Prints 
+.I histogram
+features,
+.I discrete-transform
+domain features and frame-wise registration quantity of frame pair when switched on.
+.PP
+.BI --simulate
+.br
+Simulates frame drop. Similar to
+.BI --compare
+mode except that a probablistic model in configuration file is used to determine which frames in the second capture are forced to be missed. No frame drop occurs in the first capture of the video.
+
+."brief internals
+.SH CONFIGURATIONS
+.I Display
+.br
+.RS
+.I "Show.Videos, Show.DT, Show.Hist, Show.DtBar"
+.RE
+Boolean type (takes on values
+.I "true"
+or
+.I "false"
+).
+.I Show.Videos
+creates two windows for displaying two video pairs.
+.I Show.DT
+creates two windows for displaying the
+.IB discrete-transform
+features as images. Details of discrete-transform can be found in section
+.IB "Discrete-Transform Settings"
+(DT) below.
+.I Show.Hist
+and 
+.I Show.DtBar
+creates a window to show vectorized feature from image histogram and discrete-transform domain.
+.I Show.FPS
+.sp
+Integer type. Number of frames in displaying the videos. This gives an upper-bound for actual displayed FPS as video processing can be costly (especially with frame-wise registration).
+
+.I "Histogram Settings"
+.br
+.RS
+.I Num.Bin.Hist
+.RE
+Integer type. Number of bins used to calculate histogram. Histogram feature is obtained by counting number of pixels in an image that falls into certain bin. Defaults to 30.
+
+.RS
+.I Norm.Hist
+.RE
+Boolean type. Whether the two histogram vectors are normalized to have same mean-value? This option only makes a difference when two image sizes are different. Defaults to false.
+.RS
+.I "Shape.Hist.Gap, Shape.Hist.BarWidth, Shape.Hist.Height"
+.RE
+Integer type. Number of pixels for drawing the histogram and DT bars. The width of the histogram (or DT-bar) image is determined by
+.I Num.Bin.Hist
+(or
+.I Num.Bin.DT
+),
+.I Shape.Hist.BarWidth
+and
+.I Shape.Hist.Gap
+
+.I "Frame-drop Simulation Settings"
+.RS
+.I "Prob.FrameDrop, Prob.SuccessiveDrop"
+.RE
+Float type. Probabilities of independent frame-drop in 
+.BI --simulate
+mode and conditial probability of a frame drop if previous frame is dropped. Values in range [0, 1] inclusively. Set
+.I Prob.SuccessiveDrop
+to 0 to make each frame drop an independent event.
+
+.I "Frame Buffer Settings"
+.RS
+.I Num.FB
+.RE
+Integer type. Number of frames to cache. *May* affect frame interpolation efficiency (currently NOT supported).
+.RS
+.I Constraint.RetrieveGrayFB
+.RE
+Boolean type. Whether frames are converted to gray-scale from BGR color space before they are cached.
+
+.I "Discrete-Transform Settings"
+.RS
+.I Method.DT
+.RE
+String type. Method used to convert image domain to transform domain. Takes on values "DFT.Ring", "DFT.Fan", "DCT" and "DWT" (not implemented). For discrete Fourier transform, the magnitude plane of complex transformed domain is kept while the phase plane is discarded. "DFT.Ring" partitions the magnitude plane into 
+.I Num.Bin.DT
+rings of equal width centered in the center of magnitude plane (i.e. DC component), and the mean value of each ring forms the DT feature vector; "DFT.Fan" partitions the magnitude plane into
+.I Num.Bin.DT
+fan pairs of equal degree and the mean value of each fan gives the DT feature vector, and each fan-pair are central symetric. "DCT" (discrete cosine transform, 2nd form),  has identical partition as "DFT.Ring" except centered in upper-left corner.
+.RS
+.I Constraint.DTLogScale
+.RE
+Boolean type. Should log-transform f(x)=log(1+x) of amplitude plane of transform domain be performed prior to feature vector extraction? For 2D-DFT, it should always be on to adjust for high contrast in the transform domain.
+.RS
+.I Norm.DT
+.RE
+Boolean type. Whether two feature vectors from transform domain need to be normalized with equal mean value. Note that for Chi-square criterion, the summands are very close to 0 when feature vectors are small, so that the resulting difference is always 0.
+
+.I "Frame Register Settings"
+.RS
+.I "Constraint.FRused"
+.RE
+Boolean type. Should frame-wise registration be peformed on each frame of 'transmitted' video to seek a frame of best match of 'received' video? This option is ignored when operating in
+is
+.BI "--diff-mode, --gen-video, --prepend"
+or
+.BI --register
+modes.
+.RS
+.I Behavior.FR.rmAdjacentEq
+.RE
+Boolean type. Does the 'transmitted' video contains identical adjacent frames (i.e. is 'freezing' of main video expected)? If set to be true, it is assumed that the 'transmitted' video is constantly changing, thereby any identical adjacent frames are discarded in both 'transmitted' and 'received' frames, and a counter for such identical replicates likely due to lossy video compression/transmission are reported in the end. Defaults to true. 
+.RS
+.I Num.FRSearch
+.RE
+Interger type. Frame register search range. In searching for the k-th frame of 'transmitted' video, the (k-r)-th frame to (k+r)-th frame of 'received' video are compared against the k-th frame, r being the search range, and a best match is determined to be the registered frame in received video.
+.RS
+.I Method.Cmp.FR
+.RE
+String type. Method for comparing two images. Takes on values 'FrameDiff', 'HistDiff' and 'DtDiff', meaning respectively frame-wise difference using p-norm, histogram difference and transform-domain difference. Defaults to 'FrameDiff'.
+.RS
+.I CmpCrit.FR
+.RE
+String type. Criterion for comparing two images using histogram or transform-domain features. They serve to quantize the difference between two vectors by a single number. Takes on values: correlation, intersection, chi-square and bhattacharrya. For correlation criterion, the codomain is in [-1, 1*] with 1 denoting a perfect match (i.e. two identical vectors); the codomain is in [0, 1*] for intersection; [0*, inf] for chi-square and [0*, 1] for bhattacharrya. In practice, a transform f(x)=1-x is applied to both correlation and intersection criteria such that 0 always denotes perfect match in all four cases. Also, the chi-square and intersection differences are further divided by the sum of the first feature vector to make final result on a par with other two criteria, regardless whether normalization is performed. Refer to line 208-252 of "cv_templates.cc" source code for definitions on these criteria. Defaults to correlation.
+.RS
+.I Norm.Diff
+.RE
+Integer type. The p-norm used to calculate pixel-wise
+.R difference
+between two images when
+.I Method.Cmp.FR
+is 'FrameDiff'. Set this number to 0 to use inf-norm and to -2 or less to use `memcmp' to decide if two image are identical. When this number is -1, the peak signal-to-noise ratio (PSNR) is calculated. This is defined as the log of 2-norm difference and is in unit of power decibel. In addition to frame-registration, this setting is also used to report frame-wise difference and dynamics of the two videos.
+.RS
+.I Num.Bin.FR
+.RE
+Integer type. Size of feature vector to extract from histogram or transform domain when
+.I Method.Cmp.FR
+is not 'FrameDiff'.
+.RS
+.I Constraint.FRInc
+.RE
+Boolean type. Should the matched up frame indices in secondary video be increasing? When this option is set to be true, the matched-up frame index satisfies: (1) it is increasing; (2) the difference between the matched-up index and primary video frame index does not exceed
+.I Num.FRSearch
+Thus there is a bias of the matched-up frame index and actual frame index, which can be partially elliminated when this option is false. Because of this bias, when it is set true, the best match criterion is to search for the first occurence of 20-percentile in search range, instead of the frame with least difference.
+
+.I "Self-testing Video-extension Settings"
+.sp
+This section contains options for generating a video clip from specified background image and its variation pattern used for simulation of practical video degradation. For example, frame loss and package loss may result in ghost image, deformation, blocking effect and additive noise to video.
+.RS
+.I File.BgImage
+.RE
+String type. File name of the image used as background image of generated video. The video dimension (width, height) is determined by the dimension of this image. When left empty, a 512x512 pixel monochrome image is used as background.
+.RS
+.I Bright.BgMono
+.RE
+Mixed type (colon-delimited value group) of three elements. Specifies the background color in RGB color space when
+.I File.BgImage
+is left empty. The dimension of the background image and generated video is forced to be 512x512 pixel.
+.RS
+.I File.VideoExtension
+.RE
+String type. File name of the generated video to be saved. No extension is needed and it is always saved using AVI container format.
+.RS
+.I "Video.Duration, Video.fps"
+.RE
+Integer type. Output video duration in second and frames per second.
+.RS
+.I Num.VideoObj
+.RE
+Integer type. Number of randomly generated moving/rotating objects as foreground in the video. This program is capable of generating five types of objects: ball, square, triangle, star and crescent with different properties (foreground color, additive-overwrite, size, initial position, moving and rotating speed) that bounces round in image. When set to 0, no objects are generated.
+.RS
+.I Pattern.BgVideo
+.RE
+String type. Variational pattern of background image. Only in effect when a background image is selected via
+.I File.BgImage
+option. Takes on values: None, Blur, Elevator, Cappuccino and Vapor. When it is 'None', the background image is unchanged in each frame of generated video; when it is 'Blur', a Gaussian kernel blur is applied to the background image and frames are interpolated between the original image and blurred image, achieving an effect of blurring-unblurring cycle; when it's 'Elevator', the image is constantly cyclic-moving in the specified direction; when it's 'Cappuccino', a centered image deformation (pixel-remapping without subpixel interpolation) with a sine-like kernel is used to achieve an effect mimicking stirring/vortex a cup of Cappuccino coffee; when it's Vapor, a spatial-temporal moving-average random remapping of pixels is applied through the frames, achieving an effect of observing an image through uprising vapour.
+.RS
+.I Pattern.BgVideo.Blur
+.RE
+Integer type. Number of seconds of blurring duration. The background image of output video takes this duration from original image to most-blurred image and again such duration to become clear again.
+.RS
+.I Pattern.BgVideo.Elevator
+.RE
+Mixed type of two elements. The first element specifies the number of second it takes for x- or y-direction to complete a full cycle, whichever comes first, therefore the moving speed. The second element specifies the counter-clockwise moving direction in degrees.
+.RS
+.I Pattern.BgVideo.Cappuccino
+.RE
+Mixed type of six elements. The first two specifies the normalized position of vortex center in x- (and y-) direction and is between 0 and 1, corresponding to left (upper) side and right (lower) side respectively. The third parameter specifies rotating amplitude: when set to 0 the angular speed of the vortex are identical, achieving 'casino' effect; larger values gives more warping from larger angular speed - radius relationship. The fourth parameter is normalized rotation span, fifth is rotation direction (positive: clockwise). Sixth parameter denotes whether acceleration is used in generating video. When true (set to 1), only one pixel remapping is calculated and it is more inaccurate when rotating speed is slow, thus it is disencouraged (set to 0) to use acceleration.
+.RS
+.I Pattern.BgVideo.Vapor
+.RE
+Mixed type of four elements. They are the uniform-random number range, spatial Gaussian kernel size, Gaussian sigma and temporal Hamming window taps.
+
+.I "Miscellaneous Settings"
+.RS
+.I Bright.PrepFrame
+.RE
+Integer type. Between 0 and 255 inclusively. Gray level (brightness) of prepended frame used in
+.BI --prepend
+mode. Also used for classifying the prepended frames in
+.BI --register
+mode. It should be chosen to differentiate from video content to ease video-registration.
+.RS
+.I Num.MinFrameVideo
+.RE
+Integer type. Minimum number of frames of a video to be valid in outputting in
+.BI --register
+mode. Only when two detected prepended frame blocks are separated by more than this many frames does video registration successfully find the first, last frames of the video to generate; otherwise video registration continues to search for next playback of video seperated by inserted block.
+.RS
+.I "Bright.Tol.Mean, Bright.Tol.Sd"
+.RE
+Float type. Tolerance for frame classification in
+.BI --register
+mode. A frame is classified to be an intentionally prepended frame in
+.BI --prepend
+mode only if the mean value of gray-level for all pixels in this frame lies between
+.I "Bright.PrepFrame-Bright.Tol.Mean"
+and
+.I "Bright.PrepFrame+Bright.Tol.Mean"
+and its standard deviation is below 
+.I Bright.Tol.Sd
+.RS
+.I Behavior.StopConvBadFrame
+.RE
+Boolean type. In
+.BI --prepend
+and
+.BI --register
+mode, some frames may not be successfully retrieved (captured from video file) due to compression or data corruption. It is observed that most often frame corruption takes place in last several frames. This option denotes whether to stop capturing immediately when a bad frame is encountered. Defaults true.
+.RS
+.I Num.PrependFrame
+.RE
+Integer type. Number of identical frames to be prepended in
+.BI --prepend
+mode. This number must be large enough to compensate for frame loss in the process of lossy transmission and video recapturing.
+.RS
+.I "File.Suffix.prep, File.Suffix.reg"
+.RE
+String type. Suffix to append to the original file when saving them to a new video file in
+.BI "--prepend, --register"
+modes. For example, 'video.avi' is prepended with some 'reference' frames and saved into 'video_prep.avi' if File.Suffix.prep=_prep. Defaults to '_prep' and '_reg'.
+.RS
+.I File.Log
+.RE
+String type. File name for logging frame-wise comparison result. When set to 'stdout', prints to standard output instead of literal 'stdout' file; '%f' is substituted with the partial file name of primary video before '-' character, e.g. primary video 'abc-500k.avi' with File.Log=%f_lan.log saves logging message into 'abc_lan.log'.
+.RS
+.I Video.Codec
+.RE
+String type (4-character upper-case). Video codec used in
+.BI "--prepend, --register"
+and
+.BI --gen-video
+modes. Acceptable codecs are: PIM1 (MPEG-1), MJPG (Motion Jpeg), MP42 (MPeg 4.2), DIV3 (MPeg 4.3), U263 (H263), I263 (H263I), FLV1, IYUV, XVID, DIVX and H264. These are the outputting codec formats recognized/supported by OpenCV-2.4.3. Some codecs are recognized but using them may lead to
+.R CORE DUMP.
+It's found that MJPG format is comparatively lossless among others (cost by larger file size). Defaults to MJPG.
+.RS
+.I Num.MA
+.RE
+Integer type. Order of moving average in logging the dynamics and frame-wise difference. Defaults to 1.
+.RS
+.I Noise.Type
+.RE
+String type. Additive noise type used in
+.BI --prepend
+mode. The specified type of noise pollutes each frame of the output video. Takes on values: none, salt-peper, gaussian and duplicate. 'salt-peper' and 'gaussian' are self-explanatory; duplicate creates a ghost image. Defaults to none.
+.RS
+.I Noise.Level
+.RE
+Float type. Additive noise levels for the given Noise.Type options. For salt-pepper type, it's specified as signal-noise ratio (SNR) in unit of decibels; for gaussian type, it's standard deviation of independent Gaussian random noise in unit of pixel gray-level; for duplicate, it's relative weight between 0 and 1 exclusively of the additive ghost image.
+
+.SH SEE ALSO
+ffmpeg(1), opencv
+
+.SH BUGS
+.I 1.
+Segmentation fault on exit.
+.sp
+.I 2.
+In
+.BI --gen-video
+mode, when generating randomly-moving subjects, the first frame may contain objects that disappear in later frames, so that the generated video contains less objects than specified via
+.I Num.VideoObj
+option.
+.sp
+.I 3.
+Core dumps when outputting video format is recognized by OpenCV but not supported or buggy. Suspect that OpenCV is liable.
+.sp
+.I 4.
+Please file a bug report and send to me when you catch one.
+.SH AUTHOR
+Liu Lukai (liulukai@gmail.com)
