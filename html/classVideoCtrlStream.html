@@ -44,6 +44,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li class="current"><a href="annotated.html"><span>Classes</span></a></li>
       <li><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -77,7 +78,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Friends</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -142,6 +143,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a2064ae2d9e0238a77d32e28954406df6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2064ae2d9e0238a77d32e28954406df6"></a>
 const IplImage *&#160;</td><td class="memItemRight" valign="bottom"><b>getImg</b> (const bool &amp;first) const </td></tr>
 <tr class="separator:a2064ae2d9e0238a77d32e28954406df6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afef00a389b4f4d5fb4dafc4e5628b6d1"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="afef00a389b4f4d5fb4dafc4e5628b6d1"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>update</b> (const int &amp;d1, const int &amp;d2)</td></tr>
+<tr class="separator:afef00a389b4f4d5fb4dafc4e5628b6d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr><td colspan="2"><div class="groupHeader">getXX</div></td></tr>
 <tr><td colspan="2"><div class="groupText"><p>retrives control states/variables </p>
 </div></td></tr>
@@ -154,6 +158,9 @@ const short &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>getFrame
 <tr class="memitem:ad97d5c1de0dac3d8e31f8a4adeadcca3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad97d5c1de0dac3d8e31f8a4adeadcca3"></a>
 const short &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>getConstFrameDelay</b> () const </td></tr>
 <tr class="separator:ad97d5c1de0dac3d8e31f8a4adeadcca3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a16271b69dc420a69f809638080bcc11c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a16271b69dc420a69f809638080bcc11c"></a>
+const bool&#160;</td><td class="memItemRight" valign="bottom"><b>getUpdate</b> () const </td></tr>
+<tr class="separator:a16271b69dc420a69f809638080bcc11c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
@@ -164,7 +171,7 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>setROI</b> (<a
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-attribs"></a>
 Static Public Attributes</h2></td></tr>
 <tr class="memitem:a625148118ba7e58f18bad5525e844364"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a625148118ba7e58f18bad5525e844364"></a>
-static bool&#160;</td><td class="memItemRight" valign="bottom"><b>roiState</b> =false</td></tr>
+static bool&#160;</td><td class="memItemRight" valign="bottom"><b>roiState</b></td></tr>
 <tr class="separator:a625148118ba7e58f18bad5525e844364"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-methods"></a>
@@ -196,6 +203,13 @@ short&#160;</td><td class="memItemRight" valign="bottom"><b>frameDelay</b></td><
 <tr class="memitem:ab80f2a37c344ad502faf9881e3f16c6e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab80f2a37c344ad502faf9881e3f16c6e"></a>
 short&#160;</td><td class="memItemRight" valign="bottom"><b>curFrameDelay</b></td></tr>
 <tr class="separator:ab80f2a37c344ad502faf9881e3f16c6e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa461475aae4981d78456d329e0abc862"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa461475aae4981d78456d329e0abc862"></a>
+short&#160;</td><td class="memItemRight" valign="bottom"><b>histIndex</b></td></tr>
+<tr class="separator:aa461475aae4981d78456d329e0abc862"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6f187455e7bc32a4efe4a91cd1c37f00"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6f187455e7bc32a4efe4a91cd1c37f00"></a>
+std::vector&lt; std::pair&lt; int, <br class="typebreak"/>
+int &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>history</b></td></tr>
+<tr class="separator:a6f187455e7bc32a4efe4a91cd1c37f00"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a17d3c2ddd9e01c4c10ed9eef84b0bc3f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a17d3c2ddd9e01c4c10ed9eef84b0bc3f"></a>
 const IplImage *&#160;</td><td class="memItemRight" valign="bottom"><b>img1</b></td></tr>
 <tr class="separator:a17d3c2ddd9e01c4c10ed9eef84b0bc3f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -224,17 +238,20 @@ const IplImage *&#160;</td><td class="memItemRight" valign="bottom"><b>img20</b>
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-static-attribs"></a>
 Static Protected Attributes</h2></td></tr>
 <tr class="memitem:ad59a286c6ee95dea40c9627bf32abe06"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad59a286c6ee95dea40c9627bf32abe06"></a>
-static bool&#160;</td><td class="memItemRight" valign="bottom"><b>pause</b> =false</td></tr>
+static bool&#160;</td><td class="memItemRight" valign="bottom"><b>pause</b></td></tr>
 <tr class="separator:ad59a286c6ee95dea40c9627bf32abe06"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8d5f747641e0842e7d6a4dac8b38c8f3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8d5f747641e0842e7d6a4dac8b38c8f3"></a>
-static bool&#160;</td><td class="memItemRight" valign="bottom"><b>Esc</b> =false</td></tr>
+static bool&#160;</td><td class="memItemRight" valign="bottom"><b>Esc</b></td></tr>
 <tr class="separator:a8d5f747641e0842e7d6a4dac8b38c8f3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abd74e2faa05b9a4ce4fb7aee9ae9c1ff"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abd74e2faa05b9a4ce4fb7aee9ae9c1ff"></a>
-static bool&#160;</td><td class="memItemRight" valign="bottom"><b>trackState</b> =false</td></tr>
+static bool&#160;</td><td class="memItemRight" valign="bottom"><b>trackState</b></td></tr>
 <tr class="separator:abd74e2faa05b9a4ce4fb7aee9ae9c1ff"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac8bbc1eba4b4eee6769da84e6e205169"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac8bbc1eba4b4eee6769da84e6e205169"></a>
 static bool&#160;</td><td class="memItemRight" valign="bottom"><b>stop</b> =true</td></tr>
 <tr class="separator:ac8bbc1eba4b4eee6769da84e6e205169"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a09eb3a68b412617fe3c0f0b19b835e65"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a09eb3a68b412617fe3c0f0b19b835e65"></a>
+static bool&#160;</td><td class="memItemRight" valign="bottom"><b>rewind</b></td></tr>
+<tr class="separator:a09eb3a68b412617fe3c0f0b19b835e65"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab841932a4001d7c26a88008dc619e79b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab841932a4001d7c26a88008dc619e79b"></a>
 static int&#160;</td><td class="memItemRight" valign="bottom"><b>w1</b></td></tr>
 <tr class="separator:ab841932a4001d7c26a88008dc619e79b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -475,7 +492,7 @@ Related Functions</h2></td></tr>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Nov 24 2012 22:40:35 for MedicalVideoAnalyzer by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sat Dec 1 2012 23:00:45 for MedicalVideoAnalyzer by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.2
 </small></address>

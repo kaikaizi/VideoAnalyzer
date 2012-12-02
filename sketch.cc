@@ -829,7 +829,7 @@ void VideoDFT::dump()const {
    std::cout<<std::setprecision(4);
    std::copy(energyDist.begin(), energyDist.end(),
 	   std::ostream_iterator<double>(std::cout," "));
-   putc('\n', stdout);
+   putchar('\n');
 }
 
 //++++++++++++++++++++++++++++++++++++++++

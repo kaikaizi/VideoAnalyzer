@@ -157,7 +157,9 @@ or
 .I "false"
 ).
 .I Show.Videos
-creates two windows for displaying two video pairs.
+creates two windows for displaying two video pairs. When this option is false, the other three display options will be ignored, and no user interaction (section
+.B INTERACTION
+) will be in effect.
 .I Show.DT
 creates two windows for displaying the
 .IB discrete-transform
@@ -404,6 +406,26 @@ mode. The specified type of noise pollutes each frame of the output video. Takes
 .I Noise.Level
 .RE
 Float type. Additive noise levels for the given Noise.Type options. For salt-pepper type, it's specified as signal-noise ratio (SNR) in unit of decibels; for gaussian type, it's standard deviation of independent Gaussian random noise in unit of pixel gray-level; for duplicate, it's relative weight between 0 and 1 exclusively of the additive ghost image.
+
+.SH INTERACTION
+
+User interactions are valid only when 
+.I Show.Videos
+option is true. When the program launches, keyboard is used to control video playback, toggle full-screen (when paused) and save a frame. Key
+.B s
+: rewind both captures to first frame and pause; 
+.B <Space>
+pauses and restores the playback. When the video is paused,
+.B h/l
+keys: backward/forward one frame; key
+.B S
+saves currently focused video frame (but not discrete-transform images or histogram/DT bars) in JPEG format, prompted from console, and
+.B f
+toggles fullscreen display of selected image.
+.B <Esc>
+or
+.B q
+are used to exit playback and frame-wise registration/comparison. After video playback has reached last frame, a line plot of data in the log is shown.
 
 .SH SEE ALSO
 ffmpeg(1), opencv

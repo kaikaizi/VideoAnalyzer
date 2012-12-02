@@ -1,5 +1,6 @@
 var searchData=
 [
+  ['readme',['README',['../md_README.html',1,'']]],
   ['readwrite',['readWrite',['../classreadWrite.html',1,'']]],
   ['rebind',['rebind',['../structframeBuffer_1_1IplImageAllocator_1_1rebind.html',1,'frameBuffer::IplImageAllocator']]],
   ['reg',['reg',['../classframeRegister.html#a05d636a4de37f3e3fc4d2052e18beed1',1,'frameRegister::reg()'],['../classVideoRegister.html#a7080d47ae2861ec2d73327b38c26ab1b',1,'VideoRegister::reg()']]],

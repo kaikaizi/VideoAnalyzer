@@ -19,6 +19,7 @@
 #include <memory>
 #include <cv.h>
 #include <highgui.h>
+#include <boost/tuple/tuple.hpp>
 #include "sketch.hh"
 
 /**
@@ -231,23 +232,28 @@ public:
    const bool& getEsc()const{return Esc;}
    const short& getFrameDelay()const{return curFrameDelay;}
    const short& getConstFrameDelay()const{return frameDelay;}
+   const bool getUpdate()const{return histIndex>=history.size();}
 /**  @} */
 /**
 * @brief Keyboard interface
 * @param keyboard key events
 */
    void kbdEventHandle(const keyboard&);
-   inline const IplImage* getImg(const bool& first)const{return first?img1:img2;}
+   const IplImage* getImg(const bool& first)const{return first?img1:img2;}
+   void update(const int& d1, const int& d2){  // advance 1 frame
+	if(++histIndex>history.size())history.push_back(std::make_pair(d1,d2));
+   }
    static void setROI(myROI* mr);
 protected:
-   static bool pause, Esc, trackState, stop;
+   static bool pause, Esc, trackState, stop, rewind;
    static int w1, w2;	// track pixel brightness with right mouse down;
    static int x, y, wid;   // and focused window id
    static myROI* roi;
    static char fname[32], watermark[64];
    friend void MouseCallback(int, int, int, int, void*);
    const char* wn1, *wn2;
-   short frameDelay, curFrameDelay;
+   short frameDelay, curFrameDelay, histIndex;
+   std::vector<std::pair<int,int> > history;
    const IplImage *img1, *img2, *img10, *img20;
    fsToggle *fs1, *fs2;
    VideoProp *vp1, *vp2;
@@ -258,8 +264,8 @@ protected:
 
 /**
 * @brief buffers adjacent frames (of identical dimension) for two sets of videos.
-* Internally keeps two copies per frame: one with depth=1
-* (gray-scale) and the other with possibly depth=3 (BGR).
+* Internally keeps two copies per frame: one gray scale
+* and the other with possibly depth=3 (BGR).
 */
 class frameBuffer {
 public:

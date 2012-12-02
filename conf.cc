@@ -380,7 +380,7 @@ int cv_getopt(int argc, char* argv[], char* optargs[5], int16_t& status){
 	   case 'r':
 		strcpy(reference, optarg); reference[strlen(optarg)]=0;
 		status |= 0x10; break;
-	   case 'v': status |= 0x20; verbose=true; break;
+	   case 'v': verbose=true; break;
 	   case 'c':
 		strcpy(cmp, optarg); cmp[strlen(optarg)]=0;
 		status |= 0x40; break;
@@ -425,29 +425,29 @@ int cv_getopt(int argc, char* argv[], char* optargs[5], int16_t& status){
    return 1;
 }
 
-void summaryPlot(const int& x_max, const Logger& log){
-   const int LogSize=11; simpStat<std::vector<float> > ss[LogSize];
+void summaryPlot(const int& x_max, const Logger& log, const bool Plot){
+   const int LogSize=10; simpStat<std::vector<float> > ss[LogSize];
    size_t sz=log.get(0).size();
    for(int indx=0; indx<LogSize; ++indx){
 	ss[indx].update(log.get(indx).begin(), log.get(indx).end());
    }
    float ymax=0, p75;
    const char* category[]={"Dynamics #1","Dynamics #2","Difference","Hist_Corr",
-	"Hist_Chisq","Hist_Inter","Hist_Bhatt","DT_Corr","DT_Chisq","DT_Inter",
-	"DT_Bhatt"};
+	"Hist_Chisq","Hist_Inter","Hist_Bhatt","DT_Corr","DT_Inter", "DT_Bhatt"};
    fputs("\nSimple stats:\tMean\tSd\tMedia\t25 Perc\t 75 Perc\n", log.fd);
    for(int indx=0; indx<LogSize; ++indx){
 	if(ymax<(p75=ss[indx].perc(.75)))ymax=p75;
 	fprintf(log.fd, "%s: %Lf\t%Lf\t%Lf\t%Lf\t%f\n", category[indx], ss[indx].mean(),
 		ss[indx].sd(), ss[indx].perc(.5), ss[indx].perc(.25), p75);
    }
+   if(!Plot)return;
    float dims[]={0., static_cast<float>(x_max), 0., ymax};
    std::vector<float> x(sz); Plot2D::LineType lt[11];
    for(int indx=0; indx<3; ++indx)lt[indx]=Plot2D::Solid;
    for(int indx=3; indx<10;)lt[indx++]=Plot2D::Dot,
 	lt[indx++]=Plot2D::Dash, lt[indx++]=Plot2D::DashDot;
    for(int indx=1; indx<sz; ++indx)x[indx]=indx;
-   Plot2D plot(cv::Size(800,600), dims, cv::Scalar(255,255,255), cv::Scalar(0));
+   Plot2D plot(cv::Size(800,600), dims, cv::Scalar(0), cv::Scalar(255,255,255));
    cv::Scalar fg[]={ // Dynamics, difference
 	cv::Scalar(128,100,200), cv::Scalar(128,100,180), cv::Scalar(200,100,128),
      	cv::Scalar(128,0,200), cv::Scalar(128,0,200), cv::Scalar(200,0,128), cv::Scalar(250,50,155),
@@ -457,7 +457,7 @@ void summaryPlot(const int& x_max, const Logger& log){
 	if(indx<3) plot.set(x, log.get(indx), fg[indx], thick[indx], lt[indx]);
 	else{
 	   int ratio = std::min(1000,std::max(1,
-			static_cast<int>(ymax/ss[indx].perc(1))/20*20));
+			static_cast<int>(ymax/ss[indx].perc(1)/20)*20));
 	   std::vector<float> f(log.get(indx));
 	   std::transform(f.begin(),f.end(),f.begin(),
 		   std::bind1st(std::multiplies<float>(), ratio));
@@ -557,7 +557,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
    loadConf lc(confname, status&0x4?true:false);
    if(status&0x4)return;
    int conf_int[loadConf::IntCap], pos2=0;	// place holder for configurations
-   bool conf_bool[loadConf::BoolCap], normDiff[]={conf_bool[9],conf_bool[10]};
+   bool conf_bool[loadConf::BoolCap];
    char conf_char, *conf_str[loadConf::StrCap];
    float conf_float[loadConf::FloatCap], noiseLevel[3];
    Criterion conf_crit[loadConf::CritCap];
@@ -565,6 +565,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
    createAnimation::Bgvt conf_bgvt; CvScalar conf_scal;
    lc.get(conf_bool, conf_int, conf_char, conf_str, conf_float, conf_crit, conf_dm,
 	   conf_tr, conf_bgvt, conf_scal);
+   bool normDiff[]={conf_bool[9],conf_bool[10]};
    conf_bool[7]&=!(status&0x100);	// disable frame-register options for diff-mode
    if(status&0x80){			// gen-video
 	const int len=strlen(conf_str[4]);
@@ -676,20 +677,21 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 			case VideoCtrlStream::PrevFrame:
 			case VideoCtrlStream::NextFrame:
 			case VideoCtrlStream::Startstop:
-			   up.update(false); pos2=0;
-			   if(status&0x20)up.dump();	// verbosity
-			   cvShowImage(video_str[0], fse.get(true));
-			   cvShowImage(video_str[1], fse.get(false)); break;
+			    if(keystroke==VideoCtrlStream::NextFrame)	// update history database
+				 vcs->update(vp_main.prop.posFrame,vp_sec.prop.posFrame);
+			    up.update(false, vcs->getUpdate());	pos2=0;
+			    cvShowImage(video_str[0], fse.get(true));
+			    cvShowImage(video_str[1], fse.get(false)); break;
 			case VideoCtrlStream::ToggleFs:
-			   cvShowImage(video_str[0], vcs->getImg(true));
-			   cvShowImage(video_str[1], vcs->getImg(false)); break;
-			case VideoCtrlStream::SPACE:
-			   up.update(true); break;
+			    cvShowImage(video_str[0], vcs->getImg(true));
+			    cvShowImage(video_str[1], vcs->getImg(false)); break;
 			case VideoCtrlStream::ESC:
 			case VideoCtrlStream::Quit: break;
+			case VideoCtrlStream::SPACE:
 			case VideoCtrlStream::NUL:
 			    up.update(!vcs->getFrameDelay());
 			    if(vcs->getFrameDelay()){
+				 vcs->update(vp_main.prop.posFrame, vp_sec.prop.posFrame);
 				 cvShowImage(video_str[0], fse.get(true));
 				 cvShowImage(video_str[1], fse.get(false));
 			    }
@@ -700,14 +702,14 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 	}
 	printf("%s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));
-	summaryPlot(vp_main.prop.fcount, logs);
+	summaryPlot(vp_main.prop.fcount, logs, roi);
 	delete psdf; delete pfr; delete roi; delete vcs;
 	cvReleaseCapture(&cap_main); cvReleaseCapture(&cap_sec);
    }catch(const ErrMsg& err){
 	if(err.errnos()==1){
 	   printf("%s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		   frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));
-	   summaryPlot(vp_main.prop.fcount, logs);
+	   summaryPlot(vp_main.prop.fcount, logs, roi);
 	}
 	delete psdf; delete pfr; delete roi; delete vcs;
 	cvReleaseCapture(&cap_main); cvReleaseCapture(&cap_sec);

@@ -19,7 +19,6 @@
 #include <highgui.h>
 #include <deque>
 #include <map>
-#include <boost/tuple/tuple.hpp>
 #include "hist.hh"
 
 class myROI;

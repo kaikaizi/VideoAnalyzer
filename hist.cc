@@ -195,11 +195,11 @@ void Hist::dump()const
    if(src1)std::transform(bin1.begin(), bin1.end(), std::ostream_iterator<float>(std::cout," "),
 		std::bind1st(std::multiplies<float>(),(0.+scale.height)/histMax*6));
    if(src2) {
-	putc('\n', stdout);
+	putchar('\n');
 	std::transform(bin2.begin(), bin2.end(), std::ostream_iterator<float>(std::cout," "),
 		std::bind2nd(std::multiplies<float>(),(0.+scale.height)/histMax*6));
    }
-   putc('\n', stdout);
+   putchar('\n');
 }
 
 void Hist::draw() {
@@ -272,8 +272,8 @@ void simDropFrame::dump()const {
 // NOTE: roi object must be assigned before used
 // NOTE2: roi is not used within class.
 
-bool VideoCtrlStream::pause=false, VideoCtrlStream::Esc=false, VideoCtrlStream::stop=true,
-     VideoCtrlStream::trackState=false, VideoCtrlStream::roiState=false;
+bool VideoCtrlStream::pause, VideoCtrlStream::Esc, VideoCtrlStream::stop=true,
+     VideoCtrlStream::trackState, VideoCtrlStream::roiState, VideoCtrlStream::rewind;
 myROI* VideoCtrlStream::roi;
 int VideoCtrlStream::x, VideoCtrlStream::y, VideoCtrlStream::wid, VideoCtrlStream::w1,
     VideoCtrlStream::w2=1;
@@ -282,7 +282,7 @@ char VideoCtrlStream::fname[], VideoCtrlStream::watermark[];
 VideoCtrlStream::VideoCtrlStream(IplImage* images[2], const char* wns[2],
 	VideoProp* pvp[2], pfMouseCB* pm, const short& fd):img1(images[0]),img2(images[1]),
    curFrameDelay(0),frameDelay(fd),vp1(pvp[0]),vp2(pvp[1]),fs1(new fsToggle(img1)),
-   fs2(new fsToggle(img2)),wn1(wns[0]),wn2(wns[1]),img10(img1),img20(img2){
+   fs2(new fsToggle(img2)),wn1(wns[0]),wn2(wns[1]),img10(img1),img20(img2),histIndex(0){
    if(img1->width!=img2->width || img1->height!=img2->height) {
 	printf("Size=[%d %d]/[%d %d]\n", img1->width, img1->height,
 		img2->width, img2->height);
@@ -301,7 +301,12 @@ VideoCtrlStream::~VideoCtrlStream(){
 }
 
 void VideoCtrlStream::setPause() {
-   if(!stop) curFrameDelay=(pause=!pause)?0:frameDelay;
+   if(!stop && !(curFrameDelay=(pause=!pause)?0:frameDelay)){
+	cvSetCaptureProperty(vp1->cap, CV_CAP_PROP_POS_FRAMES,
+		vp1->prop.posFrame=history[--histIndex].first);
+	cvSetCaptureProperty(vp2->cap, CV_CAP_PROP_POS_FRAMES, 
+		vp2->prop.posFrame=history[histIndex].second);
+   }
 }
 
 void VideoCtrlStream::setROI(myROI* mr){roi=mr;}
@@ -309,30 +314,27 @@ void VideoCtrlStream::setROI(myROI* mr){roi=mr;}
 void VideoCtrlStream::kbdEventHandle(const keyboard& kbd) {
    img1=img10, img2=img20;	// in case fs substitutes img1/img2
    switch(kbd) {
-	case NUL: return;	   // no key-event
-	case SPACE: setPause(); break;
-	case NextFrame: break;
+	case NUL: return;		// no key-event intercepted
+	case SPACE:
+	    setPause(); break;
+	case NextFrame:if(rewind)rewind=!(++histIndex); break;
 	case PrevFrame:
-	   if(vp1->prop.posFrame>1){
-		cvSetCaptureProperty(vp1->cap, CV_CAP_PROP_POS_FRAMES, vp1->prop.posFrame-=2);
-		vp1->update();
-	   }
-	   if(vp2->prop.posFrame>1){
-		cvSetCaptureProperty(vp2->cap, CV_CAP_PROP_POS_FRAMES, vp2->prop.posFrame-=2);
-		vp2->update();
-	   }
+	   rewind=true;
+	   cvSetCaptureProperty(vp1->cap, CV_CAP_PROP_POS_FRAMES, vp1->prop.posFrame
+		   =history[--histIndex>0?histIndex:histIndex=0].first);
+	   cvSetCaptureProperty(vp2->cap, CV_CAP_PROP_POS_FRAMES, vp2->prop.posFrame
+		   =history[histIndex].second);
 	   break;
 	case Quit:
 	case ESC: setEsc(); break;
 	case Startstop:
-	   if(stop=!stop) {
-		curFrameDelay = 0;
-		cvSetCaptureProperty(vp1->cap, CV_CAP_PROP_POS_FRAMES,
-			vp1->prop.posFrame=vp1->prop.posRatio=0);
-		cvSetCaptureProperty(vp2->cap, CV_CAP_PROP_POS_FRAMES,
-			vp2->prop.posFrame=vp2->prop.posRatio=0);
-	   }else if(!pause)
-		curFrameDelay = frameDelay;
+	   if(stop=!stop){
+		curFrameDelay = histIndex = 0;
+		cvSetCaptureProperty(vp1->cap, CV_CAP_PROP_POS_FRAMES, vp1->prop.posFrame
+			=vp1->prop.posRatio=0);
+		cvSetCaptureProperty(vp2->cap, CV_CAP_PROP_POS_FRAMES, vp2->prop.posFrame
+			=vp2->prop.posRatio=0);
+	   }else if(!pause)curFrameDelay=frameDelay;
 	   break;
 	case ToggleFs:	// call getImg after this in upper-level
 	   (wid==w1?fs1:fs2)->update();
@@ -365,8 +367,13 @@ void VideoCtrlStream::kbdEventHandle(const keyboard& kbd) {
 		}
 		fprintf(stderr, "\"%s\" saved.\n", fname);
 	   }
-	default:;
    }
+   fputs("\b\b\b\b\b\b\b\b\b\b\b\b\b",stdout);	   // messy console control...
+   fflush(stdout);
+   if((kbd==PrevFrame || kbd==NextFrame) && !getUpdate())
+	printf("%d %d   ", history[histIndex].first, history[histIndex].second);
+   fflush(stdout);
+   if(kbd!=PrevFrame)rewind=false;
 }
 
 void VideoCtrlStream::waterMark(cv::Mat& img, const char* title, const

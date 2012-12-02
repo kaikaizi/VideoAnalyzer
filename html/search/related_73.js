@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['summaryplot',['summaryPlot',['../classLogger.html#a0c87ed372843824f70521a03de15d309',1,'Logger']]]
+  ['summaryplot',['summaryPlot',['../classLogger.html#aab0f04f0a262c759cf0675cdf2cf188c',1,'Logger']]]
 ];

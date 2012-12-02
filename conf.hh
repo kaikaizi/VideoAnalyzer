@@ -144,5 +144,6 @@ void cv_procOpt(char*const * optargs, const int16_t& status)throw(ErrMsg,
 * in the end
 * @param x_max max range of x-coordinate
 * @param log Logger object to retrieve history data
+* @param Plot whether to display curve plotting.
 */
-void summaryPlot(const int& x_max, const Logger& log);
+void summaryPlot(const int& x_max, const Logger& log, const bool Plot);

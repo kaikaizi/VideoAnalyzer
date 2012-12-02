@@ -13,5 +13,5 @@ var searchData=
   ['solidmoveadd',['solidMoveAdd',['../classVideoRegister.html#aa154c85f8e28d1b9758a718fb9243ae8',1,'VideoRegister']]],
   ['sqrt',['Sqrt',['../structSqrt.html',1,'']]],
   ['state',['STATE',['../structPlot2D_1_1STATE.html',1,'Plot2D']]],
-  ['summaryplot',['summaryPlot',['../classLogger.html#a0c87ed372843824f70521a03de15d309',1,'Logger']]]
+  ['summaryplot',['summaryPlot',['../classLogger.html#aab0f04f0a262c759cf0675cdf2cf188c',1,'Logger']]]
 ];

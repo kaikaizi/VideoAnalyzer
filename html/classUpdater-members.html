@@ -44,6 +44,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li class="current"><a href="annotated.html"><span>Classes</span></a></li>
       <li><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -77,7 +78,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Friends</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -114,7 +115,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <tr bgcolor="#f0f0f0"class="even"><td class="entry"><b>showDft</b> (defined in <a class="el" href="classUpdater.html">Updater</a>)</td><td class="entry"><a class="el" href="classUpdater.html">Updater</a></td><td class="entry"><span class="mlabel">protected</span></td></tr>
   <tr bgcolor="#f0f0f0"><td class="entry"><b>tickFreq</b> (defined in <a class="el" href="classUpdater.html">Updater</a>)</td><td class="entry"><a class="el" href="classUpdater.html">Updater</a></td><td class="entry"><span class="mlabel">protected</span><span class="mlabel">static</span></td></tr>
   <tr class="even"><td class="entry"><a class="el" href="classUpdater.html#a258a6f61223947861ef509ec8fea16fe">tm</a>() const </td><td class="entry"><a class="el" href="classUpdater.html">Updater</a></td><td class="entry"></td></tr>
-  <tr><td class="entry"><a class="el" href="classUpdater.html#af7c0736c113dddc62478d1dcd19dba5b">update</a>(const bool &amp;locked=false)</td><td class="entry"><a class="el" href="classUpdater.html">Updater</a></td><td class="entry"></td></tr>
+  <tr><td class="entry"><a class="el" href="classUpdater.html#a82cfd72641f5f903339b19fbe0048d9a">update</a>(const bool &amp;locked, const bool &amp;log=true)</td><td class="entry"><a class="el" href="classUpdater.html">Updater</a></td><td class="entry"></td></tr>
   <tr bgcolor="#f0f0f0"class="even"><td class="entry"><b>Updater</b>(const short &amp;cnt, VideoProp **_vp, VideoDFT **_vd, myROI *_roi, Hist *_hist, frameUpdater *_fu, Logger &amp;_log, const bool &amp;_showBar=false, const bool &amp;_showDft=false) (defined in <a class="el" href="classUpdater.html">Updater</a>)</td><td class="entry"><a class="el" href="classUpdater.html">Updater</a></td><td class="entry"></td></tr>
   <tr bgcolor="#f0f0f0"><td class="entry"><b>vd_null</b> (defined in <a class="el" href="classUpdater.html">Updater</a>)</td><td class="entry"><a class="el" href="classUpdater.html">Updater</a></td><td class="entry"><span class="mlabel">protected</span></td></tr>
   <tr bgcolor="#f0f0f0"class="even"><td class="entry"><b>vd_vec</b> (defined in <a class="el" href="classUpdater.html">Updater</a>)</td><td class="entry"><a class="el" href="classUpdater.html">Updater</a></td><td class="entry"><span class="mlabel">protected</span></td></tr>
@@ -125,7 +126,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </table></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Nov 24 2012 22:40:35 for MedicalVideoAnalyzer by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sat Dec 1 2012 23:00:45 for MedicalVideoAnalyzer by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.2
 </small></address>

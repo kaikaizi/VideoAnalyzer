@@ -44,6 +44,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div id="navrow1" class="tabs">
     <ul class="tablist">
       <li><a href="index.html"><span>Main&#160;Page</span></a></li>
+      <li><a href="pages.html"><span>Related&#160;Pages</span></a></li>
       <li class="current"><a href="annotated.html"><span>Classes</span></a></li>
       <li><a href="files.html"><span>Files</span></a></li>
       <li>
@@ -77,7 +78,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Friends</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -105,9 +106,9 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:af7c0736c113dddc62478d1dcd19dba5b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classUpdater.html#af7c0736c113dddc62478d1dcd19dba5b">update</a> (const bool &amp;locked=false)</td></tr>
-<tr class="memdesc:af7c0736c113dddc62478d1dcd19dba5b"><td class="mdescLeft">&#160;</td><td class="mdescRight">updates video property, DFT, histogram, <a class="el" href="classframeUpdater.html" title="Resource manager (broker) for video pairs, so that top-level object (Updater) do not need to worry ab...">frameUpdater</a>, etc. if not locked (video paused)  <a href="#af7c0736c113dddc62478d1dcd19dba5b"></a><br/></td></tr>
-<tr class="separator:af7c0736c113dddc62478d1dcd19dba5b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a82cfd72641f5f903339b19fbe0048d9a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classUpdater.html#a82cfd72641f5f903339b19fbe0048d9a">update</a> (const bool &amp;locked, const bool &amp;log=true)</td></tr>
+<tr class="memdesc:a82cfd72641f5f903339b19fbe0048d9a"><td class="mdescLeft">&#160;</td><td class="mdescRight">updates video property, DFT, histogram, <a class="el" href="classframeUpdater.html" title="Resource manager (broker) for video pairs, so that top-level object (Updater) do not need to worry ab...">frameUpdater</a>, etc. if not locked (video paused)  <a href="#a82cfd72641f5f903339b19fbe0048d9a"></a><br/></td></tr>
+<tr class="separator:a82cfd72641f5f903339b19fbe0048d9a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a258a6f61223947861ef509ec8fea16fe"><td class="memItemLeft" align="right" valign="top">const long&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classUpdater.html#a258a6f61223947861ef509ec8fea16fe">tm</a> () const </td></tr>
 <tr class="memdesc:a258a6f61223947861ef509ec8fea16fe"><td class="mdescLeft">&#160;</td><td class="mdescRight">Gets the time elapsed (in ms) between adjacent video frame processing.  <a href="#a258a6f61223947861ef509ec8fea16fe"></a><br/></td></tr>
 <tr class="separator:a258a6f61223947861ef509ec8fea16fe"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -232,7 +233,7 @@ static std::fstream *&#160;</td><td class="memItemRight" valign="bottom"><b>pfs<
 
 </div>
 </div>
-<a class="anchor" id="af7c0736c113dddc62478d1dcd19dba5b"></a>
+<a class="anchor" id="a82cfd72641f5f903339b19fbe0048d9a"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -240,8 +241,18 @@ static std::fstream *&#160;</td><td class="memItemRight" valign="bottom"><b>pfs<
           <td class="memname">void Updater::update </td>
           <td>(</td>
           <td class="paramtype">const bool &amp;&#160;</td>
-          <td class="paramname"><em>locked</em> = <code>false</code></td><td>)</td>
+          <td class="paramname"><em>locked</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">const bool &amp;&#160;</td>
+          <td class="paramname"><em>log</em> = <code>true</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -250,6 +261,7 @@ static std::fstream *&#160;</td><td class="memItemRight" valign="bottom"><b>pfs<
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">locked</td><td>Is video playing paused? </td></tr>
+    <tr><td class="paramname">log</td><td>Append new logging data? controlled by <a class="el" href="classVideoCtrlStream.html" title="Interface with kbd for simple video playing control.">VideoCtrlStream</a> prev/nextFrame </td></tr>
   </table>
   </dd>
 </dl>
@@ -263,7 +275,7 @@ static std::fstream *&#160;</td><td class="memItemRight" valign="bottom"><b>pfs<
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Nov 24 2012 22:40:35 for MedicalVideoAnalyzer by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sat Dec 1 2012 23:00:45 for MedicalVideoAnalyzer by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.2
 </small></address>

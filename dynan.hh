@@ -262,6 +262,7 @@ protected:
    std::deque<bool> drop1, drop2, simdrop;
    frameUpdater(const frameUpdater&);
 };
+
 /**
 * @brief printes information about video quality evaluation
 */
@@ -273,15 +274,15 @@ public:
    void update();
 /**
 * @brief retrieves history data of dynamics(ID=0-1), RMSE (2)
-* histogram difference (ID=3-6), DFT difference (ID=7-10).
+* histogram difference (ID=3-6), DFT difference (ID=7-9, no Chi-square).
 * @return retrieved vector stored so far
 */
    const std::vector<float>& get(const int& id)const;
 protected:
    const char* LogFile;
-   const bool normVec;
+   bool normVec[2];
    FILE* fd;
-   friend void summaryPlot(const int&, const Logger&);
+   friend void summaryPlot(const int&, const Logger&, const bool);
    VideoProp *vp1, *vp2;
    Hist& hist;
    VideoDFT *dft1, *dft2;
@@ -289,7 +290,7 @@ protected:
    arrayDiff<float> histDiff;
    arrayDiff<double>* dftDiff;
    std::vector<float> vdyn1, vdyn2, vdiff, vhist_diff1, vhist_diff2, vhist_diff3,
-	vhist_diff4, vdft_diff1,  vdft_diff2,  vdft_diff3,  vdft_diff4;
+	vhist_diff4, vdft_diff1,  vdft_diff3,  vdft_diff4;
 /**
 * @name Logger file output buffer size, in unit of record/line
 * @{ */
@@ -329,8 +330,10 @@ public:
 * @brief updates video property, DFT, histogram,
 * frameUpdater, etc. if not locked (video paused)
 * @param locked Is video playing paused?
+* @param log Append new logging data? controlled by
+* VideoCtrlStream prev/nextFrame
 */
-   void update(const bool& locked=false);
+   void update(const bool& locked, const bool& log=true);
 /**
 * @brief Gets the time elapsed (in ms) between adjacent
 * video frame processing

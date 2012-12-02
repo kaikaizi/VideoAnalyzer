@@ -545,10 +545,10 @@ void frameUpdater::dump()const {
 //++++++++++++++++++++++++++++++++++++++++
 
 Logger::Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist&
-	hist, VideoDFT* vd[2], const bool normVec[2])throw(ErrMsg):LogFile(log),
-   vp1(vp[0]),vp2(vp[1]),dyn1(ma[0]),dyn2(ma[1]),diff(ma[2]),normVec(normVec[1]),
+	hist, VideoDFT* vd[2], const bool nv[2])throw(ErrMsg):LogFile(log),
+   vp1(vp[0]),vp2(vp[1]),dyn1(ma[0]),dyn2(ma[1]),diff(ma[2]),
    hist(hist),dft1(vd[0]),dft2(vd[1]),histDiff(hist.get(true), hist.get(false),
-	   Default, normVec[0]),dftDiff(0),bufRec(0){
+	   Default, normVec[0]=nv[0]),dftDiff(0),bufRec(0){
    if(!log)		   throw ErrMsg("Logger::ctor: log file set NULL.");
    if(!vp1 || !vp2)  throw ErrMsg("Logger::ctor: VideoProp set NULL.");
    if(!dyn1 || !dyn2 || !diff)throw ErrMsg("Logger::ctor: Dynamic/Diff set NULL.");
@@ -559,13 +559,13 @@ Logger::Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist&
 	throw ErrMsg(msg);
    }
    dftDiff = new arrayDiff<double>(dft1->getEnergyDist(), dft2->getEnergyDist(),
-	   Default, this->normVec);
+	   Default, normVec[1]=nv[1]);
    fputs("Index1\tIndex2\tDyn1\tDyn2\tDiff\tHist_Corr\tHist_Chisq\t"
-	   "Hist_Inter\tHist_Bhatta\tDT_Corr\tDT_Chisq\tDT_Inter\tDT_Bhatta\n",fd);
+	   "Hist_Inter\tHist_Bhatta\tDT_Corr\tDT_Inter\tDT_Bhatta\n",fd);
    vdyn1.reserve(vp[0]->prop.fcount); vdyn2.reserve(vp[0]->prop.fcount);
    vdiff.reserve(vp[0]->prop.fcount);
    vhist_diff1.reserve(vp[0]->prop.fcount); vhist_diff2.reserve(vp[0]->prop.fcount); vhist_diff3.reserve(vp[0]->prop.fcount); vhist_diff4.reserve(vp[0]->prop.fcount);
-   vdft_diff1.reserve(vp[0]->prop.fcount); vdft_diff2.reserve(vp[0]->prop.fcount); vdft_diff3.reserve(vp[0]->prop.fcount); vdft_diff4.reserve(vp[0]->prop.fcount);
+   vdft_diff1.reserve(vp[0]->prop.fcount); vdft_diff3.reserve(vp[0]->prop.fcount); vdft_diff4.reserve(vp[0]->prop.fcount);
    update();
 }
 
@@ -576,25 +576,22 @@ Logger::~Logger(){
 
 void Logger::update(){
    fprintf(fd,"%d\t%d\t", vp1->prop.posFrame, vp2->prop.posFrame);   // frame pos
-   float f1=dyn1->get_val(), f2=dyn2->get_val(), f3=diff->get_val(),
-	   f4=histDiff.diff(Correlation), f5=histDiff.diff(Chi_square),
-	   f6=histDiff.diff(Intersection), f7=histDiff.diff(Bhattacharyya),
-	   f8=dftDiff->diff(Correlation), f9=dftDiff->diff(Chi_square),
-	   fa=dftDiff->diff(Intersection), fb=dftDiff->diff(Bhattacharyya);
+   double ff[]={dyn1->get_val(), dyn2->get_val(), diff->get_val(), histDiff.diff(Correlation),
+	histDiff.diff(Chi_square), histDiff.diff(Intersection), histDiff.diff(Bhattacharyya),
+	dftDiff->diff(Correlation), dftDiff->diff(Intersection), dftDiff->diff(Bhattacharyya)};
    // NUMERICAL problem with f7: non-zero when den==num
-   fprintf(fd,"%.4g\t%.4g\t%.4g\t", f1, f2, f3);
-   fprintf(fd,"%.4g\t%.4g\t%.4g\t%.4g\t", f4, f5, f6, f7);
-   fprintf(fd,"%.4g\t%.4g\t%.4g\t%.4g\t\n", f8, f9, fa, fb);
+   for(int indx=0; indx<3; ++indx)fprintf(fd,"%.2f\t",ff[indx]);
+   for(int indx=3; indx<10;++indx)fprintf(fd,"%.4g\t",ff[indx]);
+   fputc('\n',fd);
    if(++bufRec>=bufRecCap && !(bufRec=0)) fflush(fd);
    // Always set both vectors with same mean when copying to object histDiff/dftDiff
-   histDiff.update(hist.get(true), hist.get(false), true);
+   histDiff.update(hist.get(true), hist.get(false), normVec[0]);
    // Normalized histogram/DFT difference
-   dftDiff->update(dft1->getEnergyDist(), dft2->getEnergyDist(), true);
-   vdyn1.push_back(f1); vdyn2.push_back(f2); vdiff.push_back(f3);
-   vhist_diff1.push_back(f4); vhist_diff2.push_back(f5);
-   vhist_diff3.push_back(f6); vhist_diff4.push_back(f7);
-   vdft_diff1.push_back(f8); vdft_diff2.push_back(f9);
-   vdft_diff3.push_back(fa); vdft_diff4.push_back(fb);
+   dftDiff->update(dft1->getEnergyDist(), dft2->getEnergyDist(), normVec[1]);
+   vdyn1.push_back(ff[0]); vdyn2.push_back(ff[1]); vdiff.push_back(ff[2]);
+   vhist_diff1.push_back(ff[3]); vhist_diff2.push_back(ff[4]);
+   vhist_diff3.push_back(ff[5]); vhist_diff4.push_back(ff[6]);
+   vdft_diff1.push_back(ff[7]); vdft_diff3.push_back(ff[8]); vdft_diff4.push_back(ff[9]);
 }
 
 const std::vector<float>& Logger::get(const int& id)const{
@@ -607,8 +604,7 @@ const std::vector<float>& Logger::get(const int& id)const{
 	case 5: return vhist_diff3;
 	case 6: return vhist_diff4;
 	case 7: return vdft_diff1;
-	case 8: return vdft_diff2;
-	case 9: return vdft_diff3;
+	case 8: return vdft_diff3;	// skipping DT Chi-square
 	default: return vdft_diff4;
    }
 }
@@ -691,11 +687,13 @@ void Updater::write() {
    pfs->flush();
 }
 
-void Updater::update(const bool& locked) {
+void Updater::update(const bool& locked, const bool& log) {
    if(roi)roi->update();
    if(!locked) {
-	if(!firstCall)logs.update();
 	if(!vp_null)BOOST_FOREACH(VideoProp* i, vp_vec)i->update();
+	if(fu)fu->update();
+	if(log && !firstCall)logs.update();
+	if(hist)hist->update();
 	if(!vd_null){
 	   BOOST_FOREACH(VideoDFT* i, vd_vec)i->update();
 	   if(showBar)cv::imshow("DftBars", dftBar->draw(vd_vec[0]->getEnergyDist(),
@@ -705,7 +703,6 @@ void Updater::update(const bool& locked) {
 		cv::imshow("Dft2", vd_vec[1]->getDftMag());
 	   }
 	}
-	if(hist)hist->update(); if(fu)fu->update();
    }
    prevTick = curTick; curTick = cv::getTickCount(); firstCall=false;
    if(verbose)dump();
