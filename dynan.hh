@@ -117,7 +117,9 @@ public:
 /** @brief ratio of widths of two frames */
    const float& getR()const {return ratio;}
 protected:
-   // skipping 3-element linear combination
+   // alternatives: CV_INTER_NN, CV_INTER_LINEAR, CV_INTER_CUBIC,
+   // CV_INTER_AREA, CV_INTER_LANCZOS4
+   const static int InterpMethod=CV_INTER_CUBIC;  
    IplImage *iframe1, *iframe2, *oframe1, *oframe2;
    const float ratio;
    const bool img1Cvt, img2Cvt, img1Created, img2Created;

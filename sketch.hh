@@ -299,6 +299,12 @@ protected:
 };
 
 /**
+* @brief test discrete transforms with 3 patterns
+* @relates VideoDFT
+*/
+void DtTest();
+
+/**
 * @brief plot line segments on a canvass
 */
 class Plot2D{

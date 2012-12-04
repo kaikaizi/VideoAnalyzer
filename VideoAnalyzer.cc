@@ -3,6 +3,7 @@
 
 int main(int argc, char *argv[])
 {
+//    DtTest(); return 0;
    try{
 	char str0[ARGLEN], str1[ARGLEN], str2[ARGLEN], str3[ARGLEN], str4[ARGLEN],
 	     *opt_args[]={str0, str1, str2, str3, str4};

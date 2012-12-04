@@ -316,12 +316,12 @@ frameSizeEq::frameSizeEq(IplImage* pfrm[2]):iframe1(pfrm[0]),iframe2(pfrm[1]),
    }
    if(img1Created){	   /* enlarge iframe1 */
 	oframe1 = cvCreateImage(cvGetSize(iframe2),iframe2->depth,iframe2->nChannels);
-	cvResize(iframe1, oframe1, CV_INTER_LINEAR);
+	cvResize(iframe1, oframe1, InterpMethod);
 	if(img1Cvt)cvt2Gray(oframe1);	// `cvCvtColor' doesn't support in-place conversion
    }
    if(img2Created) {
 	oframe2 = cvCreateImage(cvGetSize(iframe1),iframe1->depth,iframe1->nChannels);
-	cvResize(iframe2, oframe2, CV_INTER_LINEAR);
+	cvResize(iframe2, oframe2, InterpMethod);
 	if(img2Cvt)cvt2Gray(oframe2);
    }
 }
@@ -342,12 +342,12 @@ frameSizeEq::~frameSizeEq() {
 void frameSizeEq::update(const bool& first) {
    if(first) {
 	if(img1Created){
-	   cvResize(iframe1, oframe1, CV_INTER_LINEAR);
+	   cvResize(iframe1, oframe1, InterpMethod);
 	   if(img1Cvt)cvt2Gray(oframe1);
 	}else oframe1 = iframe1;
    }else{
 	if(img2Created){
-	   cvResize(iframe2, oframe2, CV_INTER_LINEAR);
+	   cvResize(iframe2, oframe2, InterpMethod);
 	   if(img2Cvt)cvt2Gray(oframe2);
 	}else oframe2 = iframe2;
    }
@@ -520,7 +520,8 @@ void frameUpdater::update(){
 	   frame2=cvQueryFrame(vp2->cap); fb->update(true);
 	   fse.update(!(drop2[fc2++]=++ndrop2Sim));
 	}
-   }while(frame1&&frame2&&!calcImgDiff(fse.get(true),fb->get(1,true),mask,-2));
+   }while(frame1 && frame2 && rmAdjEq &&
+	   !calcImgDiff(fse.get(true),fb->get(1,true),mask,-2));
    capEOF=!(frame1&&frame2);
    ma_val[0]->append(calcImgDiff(fse.get(true),fb->get(1,true),
 		frameBuffer::getMask(), normDiff));

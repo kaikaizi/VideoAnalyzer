@@ -716,3 +716,4 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 	if(err.errnos()!=1)throw;
    }
 }
+

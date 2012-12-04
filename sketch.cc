@@ -337,7 +337,6 @@ void bufferedArray::read(std::fstream* fs){ // clears and loads data
 // myROI   (objID=0x8)
 // TODO: pass getPolyMat to line 436"dynan.cc",
 // frameRegister::calcDiff?? self-alloc??
-// TODO: clear polygon after flashing
 
 const char *myROI::exWscope="myROI::write():", *myROI::exRscope="myROI::read():";
 
@@ -797,7 +796,7 @@ void VideoDFT::update() {
 	case DCT:
 	   padded.convertTo(padded, CV_32F);
 	   cv::dct(padded, dftMag);	   // calc DFT
-	default:puts("???");
+	default:;
    }
    if(log_energy){	   // log(1+abs(x))
 	(dftMag += cv::Scalar::all(1)).convertTo(dftMag,CV_32F);
@@ -812,7 +811,6 @@ void VideoDFT::update() {
 	   q3(dftMag, cv::Rect(cx, cy, cx, cy));
 	q0.copyTo(tmp); q3.copyTo(q0); tmp.copyTo(q3);
 	q1.copyTo(tmp); q2.copyTo(q1); tmp.copyTo(q2);
-	cv::normalize(dftMag, dftMag, 0, 1, cv::NORM_MINMAX);
    }
    cv::normalize(dftMag, dftMag, 0, 1, cv::NORM_MINMAX);
    energyDist.assign(nBin, 0.);
@@ -830,6 +828,37 @@ void VideoDFT::dump()const {
    std::copy(energyDist.begin(), energyDist.end(),
 	   std::ostream_iterator<double>(std::cout," "));
    putchar('\n');
+}
+
+// test DT transforms on certain patterns
+void DtTest(){
+   /* Testing DCT for known patterns */
+   const int dim=512, ringWid=32;
+   IplImage* img=cvCreateImage(cvSize(dim,dim), 8, CV_8UC1),
+	*img2=cvCreateImage(cvSize(dim,dim), 8, CV_8UC1),
+	*img3=cvCreateImage(cvSize(dim,dim), 8, CV_8UC1);
+   memset(img->imageData, 0, img->imageSize);
+   memset(img2->imageData, 0, img2->imageSize);
+   memset(img3->imageData, 0, img3->imageSize);
+   const int d=dim/3;
+   for(int y=0; y<dim; ++y)
+	for(int x=0; x<dim; ++x){
+	   if(static_cast<int>(sqrt((x-(dim>>1))*(x-(dim>>1))+
+			   (y-(dim>>1))*(y-(dim>>1))))/ringWid%2)
+		*(img->imageData+y*img->widthStep+x)=255;   // rings
+	   if(x/ringWid%2 && y/ringWid%2)
+		*(img2->imageData+y*img2->widthStep+x)=255;  // checkboard
+	   if(static_cast<int>(sqrt((x-x/d*d-(d>>1))*(x-x/d*d-(d>>1))+
+			   (y-y/d*d-(d>>1))*(y-y/d*d-(d>>1))))/ringWid%2)
+		*(img3->imageData+y*img3->widthStep+x)=255;  // multi-rings
+	}
+   VideoDFT dct1(img, VideoDFT::DCT, 20), dft1(img, VideoDFT::DFT, 20);
+   cvShowImage("w1",img);  cv::imshow("w1t1",dct1.getDftMag()); cv::imshow("w1t2",dft1.getDftMag());
+   VideoDFT dct2(img2, VideoDFT::DCT, 20), dft2(img2, VideoDFT::DFT, 20);
+   cvShowImage("w2",img2); cv::imshow("w2t1",dct2.getDftMag()); cv::imshow("w2t2",dft2.getDftMag());
+   VideoDFT dct3(img3, VideoDFT::DCT, 20), dft3(img3, VideoDFT::DFT, 20);
+   cvShowImage("w3",img3); cv::imshow("w3t1",dct3.getDftMag()); cv::imshow("w3t2",dft3.getDftMag());
+   while('q'!=cvWaitKey(0));
 }
 
 //++++++++++++++++++++++++++++++++++++++++
@@ -859,7 +888,6 @@ struct Plot2D::STATE{
 	   case 2: state=3; break;
 	   default: state=0; break;
 	}
-// 	printf("switched to %d\n", state);
    }
 };
 
