@@ -92,6 +92,7 @@ void loadConf::generate()throw(ErrMsg){
    fputs("\n# Frame per sec when playing videos. Due to computational burden, typically actual FPS < half of given number\n#Show.FPS=10\n", fd);
    fputs("\n# Type of additive noise polluted to each frame before prepending frame and saving video to a file.\n# Alternatives are: none, salt-peper, gaussian, duplicate.\n#Noise.Type=none\n", fd);
    fputs("\n# Additive noise level specified as SNR in unit of Decibel for salt-peper, sigma (standard deviation) for gaussian; added weight for duplicate, polluted to each frame before saving to file\n#Noise.Level=0\n", fd);
+   fputs("\n# Apply drop sequence when prepending frame to video?\n#Behavior.Prepend.DropUsed=false\n", fd);
    fclose(fd);
 }
 
@@ -149,7 +150,8 @@ int loadConf::parseline(FILE* fd){
 	confdata.conf_bools[8]=strcasecmp("false",value);
    else if(!strcmp("Norm.Hist",option))confdata.conf_bools[9]=strcasecmp("false",value);
    else if(!strcmp("Norm.DT",option))  confdata.conf_bools[10]=strcasecmp("false",value);
-   else if(!strcmp("Behavior.FR.rmAdjacentEq",option))  confdata.conf_bools[12]=strcasecmp("false",value);
+   else if(!strcmp("Behavior.FR.rmAdjacentEq",option)) confdata.conf_bools[12]=strcasecmp("false",value);
+   else if(!strcmp("Behavior.Prepend.DropUsed",option))confdata.conf_bools[13]=strcasecmp("false",value);
    else if(!strcmp("Num.HistBin",option))	confdata.Num_Bin_Hist=atoi(value);
    else if(!strcmp("Shape.Hist.Gap",option))	confdata.Shape_Hist_Gap=atoi(value);
    else if(!strcmp("Shape.Hist.BarWidth",option))confdata.Shape_Hist_BarWidth=atoi(value);
@@ -255,10 +257,10 @@ void loadConf::dump()const{
    printf("\tShow.Videos=%d, Show.DT=%d, Show.DtBar=%d, Show.Hist=%d, Constraint.DtLogScale=%d, "
 	   "Constraint.RetrieveGrayFB=%d, Constraint.FRused=%d, Constraint.FRInc=%d, "
 	   "Behavior.StopConvBadFrame=%d, Norm.Hist=%d, Norm.DT=%d, Method.DFT.Ring=%d, "
-	   "Behavior.FR.rmAdjacentEq=%d\n", confdata.conf_bools[0], confdata.conf_bools[1],
+	   "Behavior.FR.rmAdjacentEq=%d, Behavior.Prepend.DropUsed=%d\n", confdata.conf_bools[0], confdata.conf_bools[1],
 	   confdata.conf_bools[2], confdata.conf_bools[3], confdata.conf_bools[4], confdata.conf_bools[5],
 	   confdata.conf_bools[6], confdata.conf_bools[7], confdata.conf_bools[8], confdata.conf_bools[9],
-	   confdata.conf_bools[10], confdata.conf_bools[11], confdata.conf_bools[12]);
+	   confdata.conf_bools[10], confdata.conf_bools[11], confdata.conf_bools[12], confdata.conf_bools[13]);
    printf("\tShape.Hist.Gap=%d, Shape.Hist.BarWidth=%d, Shape.Hist.Height=%d, Num.Bin.Hist=%d, Num.Bin.FR=%d, "
 	   "Num.FB=%d, Num.Bin.DT=%d, Num.FRSearch=%d, Num.MinFrameVideo=%d, Num.PrependFrame=%d, Num.MA=%d, "
 	   "Num.VideoObj=%d, Norm.Diff=%d, Bright.Tol.Mean=%d, Bright.Tol.Sd=%d, Show.FPS=%d, Video.FPS=%d\n",
@@ -597,7 +599,12 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 	int tols[] = {conf_int[13], conf_int[14], conf_int[8]};
 	vr.setTol(tols, conf_bool[8]);
 	memcpy(noiseLevel, conf_float+2*sizeof(float), 3*sizeof(float));
-	if(status&0x8)vr.prepend(conf_str[0], conf_int[9], conf_int[16], noiseLevel);
+	if(status&0x8){
+	   simDropFrame *sd=conf_bool[13]? new simDropFrame(vp_main.prop.fcount,
+		   conf_float[0], conf_float[1]) : 0;
+	   vr.prepend(conf_str[0], conf_int[9], conf_int[16], noiseLevel, sd);
+	   if(sd)delete sd;
+	}
 	else{
 	   VideoProp vp_sec(cvCreateFileCapture(reference));
 	   vr.save(conf_str[1], cv::Size(vp_sec.prop.width, vp_sec.prop.height));

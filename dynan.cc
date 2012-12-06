@@ -734,7 +734,7 @@ VideoRegister::VideoRegister(VideoProp& vp, char*const fname, const char& bright
 VideoRegister::~VideoRegister(){delete[] appName;}
 
 void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
-	const float* noiseLevel)throw(ErrMsg,cv::Exception){
+	const float* noiseLevel, simDropFrame* df)throw(ErrMsg,cv::Exception){
    if(!suf){
 	sprintf(msg,"VideoRegister::prepend(): file name NULL.\n"); throw ErrMsg(msg);
    }
@@ -752,15 +752,17 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
 		vp.prop.fps, cvSize(vp.prop.width, vp.prop.height), vp.prop.chan);
    }
    IplImage* frame;
+   const bool* dropSeq=df?df->dropArray():0;
    if(np>0){
 	frame = cvCreateImage(cvSize(vp.prop.width,vp.prop.height), vp.prop.depth,
 		vp.prop.chan);
 	memset(frame->imageData, bright, frame->imageSize);
-	for(int indx=0; indx<np; ++indx)cvWriteFrame(write, frame);
+	for(int indx=0; indx<np; ++indx)
+	   cvWriteFrame(write, frame);
 	cvReleaseImage(&frame); 
    }
    for(int cnt=0; cnt<vp.prop.fcount; ++cnt)
-	if(frame=cvQueryFrame(vp.cap)){
+	if((frame=cvQueryFrame(vp.cap)) && !(dropSeq&&*(dropSeq+cnt))){
 	   switch(noiseType){
 		case 1:	saltPepper(frame,*noiseLevel);   break;
 		case 2:	normalNoise(frame,*noiseLevel);  break;
@@ -768,7 +770,7 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
 		default:;
 	   }
 	   cvWriteFrame(write, frame);
-	} else{
+	}else if(!df){
 	   fprintf(stderr,"VideoRegister::prepend(): cannot query %d-th frame.", cnt);
 	   if(badStop){
 		fprintf(stderr," %d-%d frames discarded.\n", cnt, vp.prop.fcount);
@@ -777,6 +779,7 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
 	}
    cvReleaseVideoWriter(&write);
    cvSetCaptureProperty(vp.cap,CV_CAP_PROP_POS_FRAMES, vp.prop.posFrame);
+   if(::verbose && df)df->dump();
 }
 
 void VideoRegister::save(char*const suf, const cv::Size& sz)throw(ErrMsg,cv::Exception) {

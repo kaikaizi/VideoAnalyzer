@@ -260,7 +260,7 @@ const bool* simDropFrame::dropArray(const bool& shuffle) {
 
 void simDropFrame::dump()const {
    if(drop_array) {
-	puts("----------DropFrame dump----------");
+	printf("----------DropFrame (%d)----------\n", size);
 	for(unsigned index=0; index<size; ++index)
 	   if(drop_array[index])printf("%d ", index);
 	puts("\n------------DropFrame-------------");

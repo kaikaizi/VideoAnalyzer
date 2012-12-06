@@ -211,7 +211,7 @@ to 0 to make each frame drop an independent event.
 .RS
 .I Num.FB
 .RE
-Integer type. Number of frames to cache. *May* affect frame interpolation efficiency (currently NOT supported).
+Integer type. Number of frames cached in a circular buffer. *May* affect frame interpolation efficiency (currently NOT supported).
 .RS
 .I Constraint.RetrieveGrayFB
 .RE
@@ -406,6 +406,12 @@ mode. The specified type of noise pollutes each frame of the output video. Takes
 .I Noise.Level
 .RE
 Float type. Additive noise levels for the given Noise.Type options. For salt-pepper type, it's specified as signal-noise ratio (SNR) in unit of decibels; for gaussian type, it's standard deviation of independent Gaussian random noise in unit of pixel gray-level; for duplicate, it's relative weight between 0 and 1 exclusively of the additive ghost image.
+.RS
+.I Behavior.Prepend.DropUsed
+.RE
+Boolean type. Apply simulated frame drop model in
+.BI --prepend
+mode?
 
 .SH INTERACTION
 
@@ -419,7 +425,7 @@ pauses and restores the playback. When the video is paused,
 .B h/l
 keys: backward/forward one frame; key
 .B S
-saves currently focused video frame (but not discrete-transform images or histogram/DT bars) in JPEG format, prompted from console, and
+saves currently focused video frame (but not discrete-transform images or histogram/DT bars) in JPEG format, prompted from console. A light green watermark of format "#frame mm:ss" is added in upper-left corner of the saved image.
 .B f
 toggles fullscreen display of selected image.
 .B <Esc>

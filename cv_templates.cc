@@ -233,7 +233,7 @@ const T arrayDiff<T,CONT>::diff(const Criterion& meth) {
 		   std::divides<T>());
 	   updated[Chi_square] = true;
 	   return diffVal[Chi_square] = std::accumulate(b1.begin(),b1.end(),0)/(mean[0]==0?1:mean[0]*size);
-	case Intersection:   // sum(min(H1,H2)) ---> 1-x
+	case Intersection:   // sum(min(H1,H2))/N ---> 1-x
 	   std::transform(bin1.begin(), bin1.end(), bin2.begin(), b1.begin(), Min<T>());
 	   updated[Intersection] = true;
 	   return diffVal[Intersection] = 1-static_cast<T>(std::accumulate(b1.begin(),
