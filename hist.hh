@@ -176,9 +176,10 @@ public:
  * @param seed random generator seed. Set to 0 to seed by
  * system time
  */
-   explicit simDropFrame(const int& sz, const float& prob=.3, const float&
+   simDropFrame(const int& sz, const float& prob, const float&
 	   prob2=0, const unsigned& seed=0);
-   ~simDropFrame();
+   simDropFrame(const simDropFrame&);
+   ~simDropFrame(){delete[] drop_array;}
    const bool drop();
 /**
  * @brief Updates probablistic model
@@ -189,12 +190,13 @@ public:
 /**
  * @brief returns the drop array; re-initialize if desired
 */
-   const bool* dropArray(const bool& shuffle=false);
+   const bool* dropArray()const{return drop_array;}
+   void shuffle();
    void dump()const;
 protected:
-   float drop_prob, cond_prob;
-   bool last, *drop_array;
    int size;
+   float drop_prob, cond_prob;
+   bool *drop_array;
 };
 
 class myROI;

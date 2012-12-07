@@ -405,13 +405,17 @@ mode. The specified type of noise pollutes each frame of the output video. Takes
 .RS
 .I Noise.Level
 .RE
-Float type. Additive noise levels for the given Noise.Type options. For salt-pepper type, it's specified as signal-noise ratio (SNR) in unit of decibels; for gaussian type, it's standard deviation of independent Gaussian random noise in unit of pixel gray-level; for duplicate, it's relative weight between 0 and 1 exclusively of the additive ghost image.
+Float type. Additive noise levels for the given Noise.Type options. For salt-pepper type, it's specified as signal-noise ratio (SNR) in unit of decibels; for gaussian type, it's standard deviation of independent Gaussian random noise in unit of pixel gray-level; for duplicate, it's in format xx:yy:zz, where xx is the distance from double image to original image in pixels, yy is orientation of double image in radias, and zz is the relative weight between 0 and 1 exclusively of the additive image.
 .RS
-.I Behavior.Prepend.DropUsed
+.I Behavior.Prepend.DropMethod
 .RE
-Boolean type. Apply simulated frame drop model in
+String type. Applicable simulated frame drop model in
 .BI --prepend
-mode?
+mode. 'None' indicates no frames to be lost; 'drop' means drop certain frames according to
+.I Frame-drop Simulation Settings
+; 'freeze' means substitute all dropped frames by previous undropped frame; 'both' means 'freeze' certain dropped frames using the same 
+.I Frame-drop Simulation Settings
+settings.
 
 .SH INTERACTION
 

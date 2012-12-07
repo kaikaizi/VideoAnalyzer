@@ -73,17 +73,6 @@ void dynan::interpolate() {
 	IplImage* velx=cvCreateImage(cvSize(wid_used,hit_used), IPL_DEPTH_32F,
 		vSrcImg[0]->nChannels), *vely=cvCreateImage(cvSize(wid_used,hit_used),
 		   IPL_DEPTH_32F, vSrcImg[0]->nChannels);
-/* TODO: updated opencv now uses 2 methods with new names */
-	/*
-	ipc==Lucas_Kanades?
-	   cvCalcOpticalFlowPyrLK(vSrcImg[iLoc-1], vSrcImg[iLoc], winSz, velx, vely) :
-	   ipc==Horn_Schunck?
-	   cvCalcOpticalFlowFarneback(vSrcImg[iLoc-1], vSrcImg[iLoc], 1, velx,
-		   vely, .1, cv::TermCriteria(cv::TermCriteria::COUNT+
-			cv::TermCriteria::EPS, 30,.1)):
-	   cvCalcOpticalFlowFarneback(vSrcImg[iLoc-1], vSrcImg[iLoc],
-		   cv::Size(bmSz,bmSz), cv::Size(1,1), cv::Size(3,2), 0, velx, vely);
- */
 	if(ipc!=Block_Matching)
 	   regInterp(velx, vely);
 	cvReleaseImage(&velx);
@@ -734,7 +723,8 @@ VideoRegister::VideoRegister(VideoProp& vp, char*const fname, const char& bright
 VideoRegister::~VideoRegister(){delete[] appName;}
 
 void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
-	const float* noiseLevel, simDropFrame* df)throw(ErrMsg,cv::Exception){
+	const float* noiseLevel, const simDropFrame* df, const int& dropMethod)
+   throw(ErrMsg,cv::Exception){
    if(!suf){
 	sprintf(msg,"VideoRegister::prepend(): file name NULL.\n"); throw ErrMsg(msg);
    }
@@ -751,15 +741,18 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
 	write = cvCreateVideoWriter(appName, CV_FOURCC(Codec[0],Codec[1],Codec[2],Codec[3]),
 		vp.prop.fps, cvSize(vp.prop.width, vp.prop.height), vp.prop.chan);
    }
-   IplImage* frame;
-   const bool* dropSeq=df?df->dropArray():0;
+   IplImage* frame=np>0&&noiseType>0? cvCreateImage(cvSize(vp.prop.width,
+		vp.prop.height), vp.prop.depth, vp.prop.chan):0,
+	*framePrev=df>0 ? cvCreateImage(cvSize(vp.prop.width,
+		vp.prop.height), vp.prop.depth, vp.prop.chan):0; 
+   bool frameCap=false;
+   simDropFrame* drop2 = df && dropMethod==3 ? new simDropFrame(*df):0;
+   const bool *dropSeq=df&&dropMethod?df->dropArray():0,
+	   *dropSeq2=drop2?drop2->dropArray():0;
    if(np>0){
-	frame = cvCreateImage(cvSize(vp.prop.width,vp.prop.height), vp.prop.depth,
-		vp.prop.chan);
+	frame = framePrev;   // sharing
 	memset(frame->imageData, bright, frame->imageSize);
-	for(int indx=0; indx<np; ++indx)
-	   cvWriteFrame(write, frame);
-	cvReleaseImage(&frame); 
+	for(int indx=0; indx<np; ++indx)cvWriteFrame(write, frame);
    }
    for(int cnt=0; cnt<vp.prop.fcount; ++cnt)
 	if((frame=cvQueryFrame(vp.cap)) && !(dropSeq&&*(dropSeq+cnt))){
@@ -769,8 +762,26 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
 		case 3:	solidMoveAdd(frame, noiseLevel);
 		default:;
 	   }
-	   cvWriteFrame(write, frame);
-	}else if(!df){
+	   cvWriteFrame(write, frame); frameCap=true;
+	   if(dropMethod>1)memcpy(framePrev->imageData, frame->imageData,
+		   frame->imageSize);
+	}else if(df){
+	   if(dropMethod==2 || dropSeq2 && *(dropSeq2+cnt)){	// freezing
+		if(!frameCap){
+		   frameCap=(frame=cvQueryFrame(vp.cap));
+		   switch(noiseType){
+			case 1:	saltPepper(frame,*noiseLevel);   break;
+			case 2:	normalNoise(frame,*noiseLevel);  break;
+			case 3:	solidMoveAdd(frame, noiseLevel);
+			default:;
+		   }
+		   if(dropMethod>1)memcpy(framePrev->imageData, frame->imageData,
+			   frame->imageSize);
+		}
+		if(frame)cvWriteFrame(write, framePrev);
+		else break;
+	   }
+	}else{
 	   fprintf(stderr,"VideoRegister::prepend(): cannot query %d-th frame.", cnt);
 	   if(badStop){
 		fprintf(stderr," %d-%d frames discarded.\n", cnt, vp.prop.fcount);
@@ -779,6 +790,9 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
 	}
    cvReleaseVideoWriter(&write);
    cvSetCaptureProperty(vp.cap,CV_CAP_PROP_POS_FRAMES, vp.prop.posFrame);
+   if(drop2)delete drop2;
+   if(np>0&&noiseType>0)cvReleaseImage(&frame);
+   if(framePrev)cvReleaseImage(&framePrev);
    if(::verbose && df)df->dump();
 }
 

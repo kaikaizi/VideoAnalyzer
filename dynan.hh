@@ -402,13 +402,18 @@ public:
 * No checking for file name clashes performed.
 * @param suf suffix appended to base name.
 * @param np # consecutive prepended frames
+* @param noiseType: 0(none), 1 (salt-pepper), 2(normal-distribution),
+* 3(double-image)
 * @param df frame drop sequence
+* @param dropMethod 1: drop only; 2: freeze dropped frames; 3:
+* freeze portion of dropped frames
 * @throw ErrMsg suf string NULL
 * @throw cv::Exception video writer failed (unsupported
 * codec), or when writing to video
 * @{ */
    void prepend(char*const suf, const int& np, const int& noiseType, const
-	   float* noiseLevel, simDropFrame* df=0)throw(ErrMsg,cv::Exception);
+	   float* noiseLevel, const simDropFrame* df=0, const int& dropMethod=0)
+	throw(ErrMsg,cv::Exception);
 /**
 * @param sz hint size from reference video
 */

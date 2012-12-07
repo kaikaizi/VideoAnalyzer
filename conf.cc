@@ -92,17 +92,17 @@ void loadConf::generate()throw(ErrMsg){
    fputs("\n# Frame per sec when playing videos. Due to computational burden, typically actual FPS < half of given number\n#Show.FPS=10\n", fd);
    fputs("\n# Type of additive noise polluted to each frame before prepending frame and saving video to a file.\n# Alternatives are: none, salt-peper, gaussian, duplicate.\n#Noise.Type=none\n", fd);
    fputs("\n# Additive noise level specified as SNR in unit of Decibel for salt-peper, sigma (standard deviation) for gaussian; added weight for duplicate, polluted to each frame before saving to file\n#Noise.Level=0\n", fd);
-   fputs("\n# Apply drop sequence when prepending frame to video?\n#Behavior.Prepend.DropUsed=false\n", fd);
+   fputs("\n# Apply drop sequence when prepending frame to video? 'none' avoids applying\n# drop sequence, 'drop' deliberately drops certain frames, 'freeze' replaces\n# dropped frames with previous ones, 'both' freezes portion of dropped\n# sequence.\n", fd);
    fclose(fd);
 }
 
 loadConf::confData::confData():conf_bools(0xff0),Shape_Hist_Gap(3),Shape_Hist_BarWidth(3),
    Shape_Hist_Height(140),Num_Bin_Hist(30),Num_Bin_FR(30),Num_FB(15),Num_DT(30),Num_FRSearch(20),
    Num_MinFrameVideo(20),Num_PrependFrame(0),Num_MA(1),Num_VideoObj(5),Norm_Diff(1),Bright_Tol_Mean(10),
-   Bright_Tol_Sd(5),Show_FPS(10),Bright_PrepFrame(0xff),Bright_BgMono(cv::Scalar(50,50,50)),
-   Prob_FrameDrop(.3),Prob_SuccessiveDrop(0),Noise_Type(0),Video_FPS(15),Pattern_BgVideo_Blur(1),
-   Video_Duration(10),CmpCrit_FR(Correlation),Method_DT(VideoDFT::DFT),
-   Method_Cmp_FR(frameRegister::FrameDiff){
+   Bright_Tol_Sd(5),Show_FPS(10),Behavior_Prepend_DropMethod(0),Bright_PrepFrame(0xff),
+   Bright_BgMono(cv::Scalar(50,50,50)),Prob_FrameDrop(.3),Prob_SuccessiveDrop(0),Noise_Type(0),
+   Video_FPS(15),Pattern_BgVideo_Blur(1),Video_Duration(10),CmpCrit_FR(Correlation),
+   Method_DT(VideoDFT::DFT),Method_Cmp_FR(frameRegister::FrameDiff){
    memset(File_Suffix_prep,0,strCap); memset(File_Suffix_reg,0,strCap);
    memset(File_Log,0,strCap); memset(File_VideoCodec,0,5); memset(File_BgImage,0,strCap);
    memset(File_VideoExtension,0,strCap); memset(Noise_Level,3,sizeof(float));
@@ -151,7 +151,6 @@ int loadConf::parseline(FILE* fd){
    else if(!strcmp("Norm.Hist",option))confdata.conf_bools[9]=strcasecmp("false",value);
    else if(!strcmp("Norm.DT",option))  confdata.conf_bools[10]=strcasecmp("false",value);
    else if(!strcmp("Behavior.FR.rmAdjacentEq",option)) confdata.conf_bools[12]=strcasecmp("false",value);
-   else if(!strcmp("Behavior.Prepend.DropUsed",option))confdata.conf_bools[13]=strcasecmp("false",value);
    else if(!strcmp("Num.HistBin",option))	confdata.Num_Bin_Hist=atoi(value);
    else if(!strcmp("Shape.Hist.Gap",option))	confdata.Shape_Hist_Gap=atoi(value);
    else if(!strcmp("Shape.Hist.BarWidth",option))confdata.Shape_Hist_BarWidth=atoi(value);
@@ -177,6 +176,14 @@ int loadConf::parseline(FILE* fd){
    else if(!strcmp("Pattern.BgVideo.Elevator",option)) parseOption(value,2,confdata.Pattern_BgVideo_Elevator);
    else if(!strcmp("Pattern.BgVideo.Cappuccino",option))parseOption(value,6,confdata.Pattern_BgVideo_Cappuccino);
    else if(!strcmp("Pattern.BgVideo.Vapor",option))parseOption(value,4,confdata.Pattern_BgVideo_Vapor);
+   else if(!strcmp("Behavior.Prepend.DropMethod",option)){
+	if(!strcasecmp("none",value))confdata.Behavior_Prepend_DropMethod=0;
+	else if(!strcasecmp("drop",value))confdata.Behavior_Prepend_DropMethod=1;
+	else if(!strcasecmp("freeze",value))confdata.Behavior_Prepend_DropMethod=2;
+	else if(!strcasecmp("both",value))confdata.Behavior_Prepend_DropMethod=3;
+	else return fprintf(stderr,"Warning: invalid value \"%s\" for option \"%s\" on"
+		" line %d\n", value, option, lineNumber++);
+   }
    else if(!strcmp("Pattern.BgVideo",option)){
 	if(!strcasecmp("None",value))		confdata.Pattern_BgVideo=createAnimation::None;
 	else if(!strcasecmp("Blur",value))	confdata.Pattern_BgVideo=createAnimation::Blur;
@@ -257,10 +264,10 @@ void loadConf::dump()const{
    printf("\tShow.Videos=%d, Show.DT=%d, Show.DtBar=%d, Show.Hist=%d, Constraint.DtLogScale=%d, "
 	   "Constraint.RetrieveGrayFB=%d, Constraint.FRused=%d, Constraint.FRInc=%d, "
 	   "Behavior.StopConvBadFrame=%d, Norm.Hist=%d, Norm.DT=%d, Method.DFT.Ring=%d, "
-	   "Behavior.FR.rmAdjacentEq=%d, Behavior.Prepend.DropUsed=%d\n", confdata.conf_bools[0], confdata.conf_bools[1],
+	   "Behavior.FR.rmAdjacentEq=%d\n", confdata.conf_bools[0], confdata.conf_bools[1],
 	   confdata.conf_bools[2], confdata.conf_bools[3], confdata.conf_bools[4], confdata.conf_bools[5],
 	   confdata.conf_bools[6], confdata.conf_bools[7], confdata.conf_bools[8], confdata.conf_bools[9],
-	   confdata.conf_bools[10], confdata.conf_bools[11], confdata.conf_bools[12], confdata.conf_bools[13]);
+	   confdata.conf_bools[10], confdata.conf_bools[11], confdata.conf_bools[12]);
    printf("\tShape.Hist.Gap=%d, Shape.Hist.BarWidth=%d, Shape.Hist.Height=%d, Num.Bin.Hist=%d, Num.Bin.FR=%d, "
 	   "Num.FB=%d, Num.Bin.DT=%d, Num.FRSearch=%d, Num.MinFrameVideo=%d, Num.PrependFrame=%d, Num.MA=%d, "
 	   "Num.VideoObj=%d, Norm.Diff=%d, Bright.Tol.Mean=%d, Bright.Tol.Sd=%d, Show.FPS=%d, Video.FPS=%d\n",
@@ -281,10 +288,12 @@ void loadConf::dump()const{
 	   confdata.Pattern_BgVideo_Cappuccino[5], confdata.Pattern_BgVideo_Vapor[0],
 	   confdata.Pattern_BgVideo_Vapor[1], confdata.Pattern_BgVideo_Vapor[2],
 	   confdata.Pattern_BgVideo_Vapor[3]); 
-   printf("\tCmpCrit.FR=%s, NoiseType=%s\n", confdata.CmpCrit_FR==Correlation?"correlation":
-	   confdata.CmpCrit_FR==Chi_square?"chi-square":confdata.CmpCrit_FR==Intersection?"intersection":
-		"Bhattacharyya", confdata.Noise_Type?(confdata.Noise_Type==1?"pepper-salt":
-		   "Gaussian"):"None");
+   printf("\tCmpCrit.FR=%s, NoiseType=%s, Behavior.Prepend.DropMethod=%s\n",
+	   confdata.CmpCrit_FR==Correlation?"correlation":confdata.CmpCrit_FR==Chi_square?
+	   "chi-square":confdata.CmpCrit_FR==Intersection?"intersection":"Bhattacharyya",
+	   confdata.Noise_Type?(confdata.Noise_Type==1?"pepper-salt":"Gaussian"):"None",
+	   confdata.Behavior_Prepend_DropMethod==0?"none":confdata.Behavior_Prepend_DropMethod==1?
+	   "drop":confdata.Behavior_Prepend_DropMethod==2?"freeze":"both");
    printf("\tMethod.Cmp.FR=%s\n", confdata.Method_Cmp_FR==frameRegister::FrameDiff?"FrameDiff":
 	   (confdata.Method_Cmp_FR==frameRegister::HistDiff?"HistDiff":"DtDiff"));
    printf("\tTransform method=%s, 2D-DFT partition=%s\n", confdata.Method_DT==
@@ -313,7 +322,8 @@ void loadConf::get(bool bools[BoolCap], int ints[IntCap], char& chars, char*
 	ints[10]=confdata.Num_MA, ints[11]=confdata.Num_VideoObj,
 	ints[12]=confdata.Norm_Diff, ints[13]=confdata.Bright_Tol_Mean,
 	ints[14]=confdata.Bright_Tol_Sd, ints[15]=confdata.Show_FPS,
-	ints[16]=confdata.Noise_Type, ints[17]=confdata.Video_FPS;
+	ints[16]=confdata.Noise_Type, ints[17]=confdata.Video_FPS,
+	ints[18]=confdata.Behavior_Prepend_DropMethod;
    chars=confdata.Bright_PrepFrame;
    str[0]=const_cast<char*>(confdata.File_Suffix_prep),
 	str[1]=const_cast<char*>(confdata.File_Suffix_reg),
@@ -598,11 +608,11 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 	VideoRegister vr(vp_main, main_arg, conf_char);
 	int tols[] = {conf_int[13], conf_int[14], conf_int[8]};
 	vr.setTol(tols, conf_bool[8]);
-	memcpy(noiseLevel, conf_float+2*sizeof(float), 3*sizeof(float));
+	memcpy(noiseLevel, conf_float+2, 3*sizeof(float));
 	if(status&0x8){
-	   simDropFrame *sd=conf_bool[13]? new simDropFrame(vp_main.prop.fcount,
+	   simDropFrame *sd=conf_int[18]? new simDropFrame(vp_main.prop.fcount,
 		   conf_float[0], conf_float[1]) : 0;
-	   vr.prepend(conf_str[0], conf_int[9], conf_int[16], noiseLevel, sd);
+	   vr.prepend(conf_str[0], conf_int[9], conf_int[16], noiseLevel, sd, conf_int[18]);
 	   if(sd)delete sd;
 	}
 	else{

@@ -36,7 +36,7 @@ public:
    explicit loadConf(const char* name, const bool& use_default)throw(ErrMsg);
    void dump()const;
 
-   static const size_t BoolCap=14, IntCap=18, StrCap=6, FloatCap=20, CritCap=1;
+   static const size_t BoolCap=13, IntCap=19, StrCap=6, FloatCap=20, CritCap=1;
 /**
 * @name gets conf variables all-at-once
 */
@@ -53,11 +53,10 @@ protected:
 // 	Show_Videos, Show_DT, Show_DtBar, Show_Hist, Constraint_DtLogScale, /* 0-4 */
 // 	Constraint_RetrieveGrayFB, Constraint_FRused, Constraint_FRInc, /* 5-7 */
 // 	Behavior_StopConvBadFrame, Norm_Hist, Norm_DT, Method_DFT_Ring, Behavior_FR_rmAdjacentEq,	/* 8-12 */
-// 	Behavior_Prepend_DropUsed;
 	int Shape_Hist_Gap, Shape_Hist_BarWidth, Shape_Hist_Height, Num_Bin_Hist, Num_Bin_FR, /* 0-4 */
 	    Num_FB, Num_DT, Num_FRSearch, Num_MinFrameVideo, Num_PrependFrame, /*5-9*/
 	    Num_MA, Num_VideoObj, Norm_Diff, Bright_Tol_Mean, Bright_Tol_Sd, /* 10-14 */
-	    Show_FPS, Noise_Type, Video_FPS; /* 15-17 */
+	    Show_FPS, Noise_Type, Video_FPS, Behavior_Prepend_DropMethod; /* 15-18 */
 	static const int strCap=128;
 	char Bright_PrepFrame, File_Suffix_prep[strCap], File_Suffix_reg[strCap],
 	     File_Log[strCap], File_VideoCodec[5], File_BgImage[strCap],

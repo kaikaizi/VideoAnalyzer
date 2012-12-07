@@ -233,29 +233,28 @@ void Hist::draw() {
 // simDropFrame
 
 simDropFrame::simDropFrame(const int& size, const float& prob, const float& prob2,
-	const unsigned& seed):drop_prob(prob<0||prob>=1?.5:prob),size(size),
-   drop_array(0),cond_prob(prob2<=0||prob2>=1?prob:prob2),last(false){
+	const unsigned& seed):size(size),drop_prob(prob<0||prob>=1?.5:prob),
+   drop_array(0),cond_prob(prob2<=0||prob2>=1?drop_prob:prob2){
    srand(seed?seed:time(0));
-   drop_array = new bool[size];
-   for(short index=0; index<size; ++index)drop_array[index]=drop();
+   drop_array = new bool[size]; shuffle();
 }
 
-simDropFrame::~simDropFrame(){delete[] drop_array;}
-
-inline const bool simDropFrame::drop() {
-   return last = last? static_cast<float>(rand())/RAND_MAX < drop_prob :
-	static_cast<float>(rand())/RAND_MAX < cond_prob;
+simDropFrame::simDropFrame(const simDropFrame& sd):size(sd.size),drop_prob(sd.drop_prob),
+   cond_prob(sd.drop_prob){
+   srand(time(0));	   // force shuffle
+   drop_array = new bool[size]; shuffle();
 }
 
-inline void simDropFrame::dropProb(const float& p1, const float& p2) {
+void simDropFrame::shuffle(){
+   bool last=false;
+   for(int index=0; index<size; ++index)
+	last=drop_array[index] = last? static_cast<float>(rand())/RAND_MAX < cond_prob :
+	   static_cast<float>(rand())/RAND_MAX < drop_prob;
+}
+
+void simDropFrame::dropProb(const float& p1, const float& p2) {
    drop_prob = p1<0||p1>=1? drop_prob : p1;
    cond_prob = p2<0||p2>=1? cond_prob : p2;
-}
-
-const bool* simDropFrame::dropArray(const bool& shuffle) {
-   if(drop_array && shuffle)
-	for(short index=0; index<size; ++index)drop_array[index]=drop();
-   return drop_array;
 }
 
 void simDropFrame::dump()const {
