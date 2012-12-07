@@ -36,7 +36,7 @@ public:
    explicit loadConf(const char* name, const bool& use_default)throw(ErrMsg);
    void dump()const;
 
-   static const size_t BoolCap=13, IntCap=19, StrCap=6, FloatCap=20, CritCap=1;
+   static const size_t BoolCap=13, IntCap=19, StrCap=6, FloatCap=21, CritCap=1;
 /**
 * @name gets conf variables all-at-once
 */
@@ -62,7 +62,7 @@ protected:
 	     File_Log[strCap], File_VideoCodec[5], File_BgImage[strCap],
 	     File_VideoExtension[strCap];
 	float Prob_FrameDrop, Prob_SuccessiveDrop, Noise_Level[3], Video_Duration, Pattern_BgVideo_Blur, /* 0-6 */
-		Pattern_BgVideo_Elevator[2], Pattern_BgVideo_Cappuccino[6], Pattern_BgVideo_Vapor[4];	/* 7-19 */
+		Pattern_BgVideo_Elevator[2], Pattern_BgVideo_Cappuccino[6], Pattern_BgVideo_Vapor[4], Heuristic_FR_bound;	/* 7-20 */
 	Criterion CmpCrit_FR;
 	frameRegister::DiffMethod Method_Cmp_FR;
 	VideoDFT::Transform Method_DT;

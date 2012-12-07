@@ -345,6 +345,8 @@ void frameSizeEq::update(const bool& first) {
 // ++++++++++++++++++++++++++++++++++++++++
 
 myROI* frameRegister::roi;
+float frameRegister::heuristicSearchBound=.3;
+
 frameRegister::frameRegister(const char* cap_str[2], const int& prange, const
 	DiffMethod& me, const VideoDFT::Transform& tr, const Criterion& parm,
 	const int& nbin, const bool* drop, const bool normVec[2],const bool& inc,
@@ -420,19 +422,28 @@ const int frameRegister::reg(const int& pos, const int& prev_reg, const DiffMeth
 	frame2=cvQueryFrame(dest_cap);
    }
    prev_srcPos = pos;
-   if(!inc){
-	for(int cpos=regpos=startpos; cpos<=endpos; ++cpos)
-	   if(diffVal[cpos-startpos] < diffVal[regpos-startpos])regpos=cpos;
-   }else{	// search for 1st occurrence of <30% percential diffVal position.
-	float diffSort[count], tmp;
-	memcpy(diffSort, diffVal, count*sizeof(float));
-	qsort(diffSort, count, sizeof(float), cmpfloat);	// ascending order
-	float threshold = diffSort[static_cast<int>(.3*count)];
+   float diffSort[count];
+   memcpy(diffSort, diffVal, count*sizeof(float));
+   std::nth_element(diffSort, diffSort+static_cast<int>(heuristicSearchBound*count),
+	   diffSort+count);
+   float threshold = diffSort[static_cast<int>(heuristicSearchBound*count)];
+   if(!inc){	// both constraints use heuristic search bound
+	bool nextLeft=true; int lpos=pos, rpos=pos;
+	for(int cpos=pos; lpos>=startpos && rpos<=endpos; nextLeft=!nextLeft){
+	   if(diffVal[cpos-startpos]<=threshold){
+		regpos=cpos;break;
+	   }
+	   if(nextLeft && lpos>startpos)cpos=--lpos;
+	   else if(rpos<endpos)cpos=++rpos;
+	}
+   }else{	// search for leftmost occurrence of p-percential position
 	regpos=endpos;
 	for(int regtmp=startpos; regtmp<=endpos; ++regtmp)
-	   if(diffVal[regtmp-startpos]<=threshold && regtmp<regpos)regpos=regtmp;
+	   if(diffVal[regtmp-startpos]<=threshold && regtmp<regpos){
+		regpos=regtmp; break;
+	   }
    }
-   if(verbose)dump();
+   if(::verbose)dump();
    return regpos;
 }
 

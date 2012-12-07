@@ -281,6 +281,12 @@ is not 'FrameDiff'.
 Boolean type. Should the matched up frame indices in secondary video be increasing? When this option is set to be true, the matched-up frame index satisfies: (1) it is increasing; (2) the difference between the matched-up index and primary video frame index does not exceed
 .I Num.FRSearch
 Thus there is a bias of the matched-up frame index and actual frame index, which can be partially elliminated when this option is false. Because of this bias, when it is set true, the best match criterion is to search for the first occurence of 20-percentile in search range, instead of the frame with least difference.
+.RS
+.I Heuristic.FR.bound
+.RE
+Float type. The leftmost entry (or closest to k-th registered frame when option
+.I Constraint.FRInc
+is false) that falls within the p-th percentile is regarded as the registered frame index. May be useful when additive noise level is noticeable.
 
 .I "Self-testing Video-extension Settings"
 .sp

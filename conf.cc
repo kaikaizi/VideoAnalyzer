@@ -65,6 +65,7 @@ void loadConf::generate()throw(ErrMsg){
    fputs("\n# Norm of two image difference (in image domain) when CmpCrit.FR=FrameDiff\n#Norm.Diff=1\n",fd);
    fputs("\n# Number of bins used when HistDiff/DtDiff are chosen as measuring criterion\n#Num.Bin.FR=30\n",fd);
    fputs("\n# Should the registered frame number be strictly increasing?\n#Constraint.FRInc=true\n", fd);
+   fputs("\n# Heuristic for searching boundary. With option Constraint.FRInc set, the left-most\n# element that is below p-th percentile of differences in search range is determined\n# as matched frame; with that option unset, the element closest to k-th index frame\n# is decided to be. Lies in [0, 1].\n#Heuristic.FR.bound=.1\n", fd);
    fputs("\n#------------Self-testing Video-extension Settings------------\n",fd);
    fputs("\n# Image source used for video extension. Used as background image. When not set,\n# falls back to mono-chrome background.\n# File.BgImage=\n", fd);
    fputs("\n# Mono-chrome background in RGB values\n# Bright.BgMono=50:50:50\n",fd);
@@ -101,8 +102,8 @@ loadConf::confData::confData():conf_bools(0xff0),Shape_Hist_Gap(3),Shape_Hist_Ba
    Num_MinFrameVideo(20),Num_PrependFrame(0),Num_MA(1),Num_VideoObj(5),Norm_Diff(1),Bright_Tol_Mean(10),
    Bright_Tol_Sd(5),Show_FPS(10),Behavior_Prepend_DropMethod(0),Bright_PrepFrame(0xff),
    Bright_BgMono(cv::Scalar(50,50,50)),Prob_FrameDrop(.3),Prob_SuccessiveDrop(0),Noise_Type(0),
-   Video_FPS(15),Pattern_BgVideo_Blur(1),Video_Duration(10),CmpCrit_FR(Correlation),
-   Method_DT(VideoDFT::DFT),Method_Cmp_FR(frameRegister::FrameDiff){
+   Video_FPS(15),Pattern_BgVideo_Blur(1),Heuristic_FR_bound(.3),Video_Duration(10),
+   CmpCrit_FR(Correlation),Method_DT(VideoDFT::DFT),Method_Cmp_FR(frameRegister::FrameDiff){
    memset(File_Suffix_prep,0,strCap); memset(File_Suffix_reg,0,strCap);
    memset(File_Log,0,strCap); memset(File_VideoCodec,0,5); memset(File_BgImage,0,strCap);
    memset(File_VideoExtension,0,strCap); memset(Noise_Level,3,sizeof(float));
@@ -173,6 +174,7 @@ int loadConf::parseline(FILE* fd){
    else if(!strcmp("Prob.SuccessiveDrop",option))confdata.Prob_SuccessiveDrop=static_cast<float>(atof(value));
    else if(!strcmp("Video.Duration",option))	confdata.Video_Duration=static_cast<float>(atof(value));
    else if(!strcmp("Pattern.BgVideo.Blur",option))confdata.Pattern_BgVideo_Blur=static_cast<float>(atof(value));
+   else if(!strcmp("Heuristic.FR.Bound",option))confdata.Heuristic_FR_bound=static_cast<float>(atof(value));
    else if(!strcmp("Pattern.BgVideo.Elevator",option)) parseOption(value,2,confdata.Pattern_BgVideo_Elevator);
    else if(!strcmp("Pattern.BgVideo.Cappuccino",option))parseOption(value,6,confdata.Pattern_BgVideo_Cappuccino);
    else if(!strcmp("Pattern.BgVideo.Vapor",option))parseOption(value,4,confdata.Pattern_BgVideo_Vapor);
@@ -279,15 +281,16 @@ void loadConf::dump()const{
    printf("\tBright.PrepFrame=%d\n", confdata.Bright_PrepFrame);
    printf("\tProb.FrameDrop=%.1f, Prob.SuccessiveDrop=%.1f, Noise.Level=[%.1f %.1f %.1f], Video.Duration=%.1f, "
 	   "Pattern.BgVideo.Blur=%.1f, Pattern.BgVideo.Elevator=[%.1f %.1f], Pattern.BgVideo.Cappuccino=[%.1f "
-	   "%.1f %.1f %.1f %.1f %.1f], Pattern.BgVideo.Vapor=[%.1f %.1f %.1f %.1f]\n", confdata.Prob_FrameDrop,
-	   confdata.Prob_SuccessiveDrop, confdata.Noise_Level[0], confdata.Noise_Level[1], confdata.Noise_Level[2],
-	   confdata.Video_Duration, confdata.Pattern_BgVideo_Blur, confdata.Pattern_BgVideo_Elevator[0],
+	   "%.1f %.1f %.1f %.1f %.1f], Pattern.BgVideo.Vapor=[%.1f %.1f %.1f %.1f], Heuristic.FR.bound=%.1f\n",
+	   confdata.Prob_FrameDrop, confdata.Prob_SuccessiveDrop, confdata.Noise_Level[0],
+	   confdata.Noise_Level[1], confdata.Noise_Level[2], confdata.Video_Duration,
+	   confdata.Pattern_BgVideo_Blur, confdata.Pattern_BgVideo_Elevator[0],
 	   confdata.Pattern_BgVideo_Elevator[1], confdata.Pattern_BgVideo_Cappuccino[0],
 	   confdata.Pattern_BgVideo_Cappuccino[1], confdata.Pattern_BgVideo_Cappuccino[2],
 	   confdata.Pattern_BgVideo_Cappuccino[3], confdata.Pattern_BgVideo_Cappuccino[4],
 	   confdata.Pattern_BgVideo_Cappuccino[5], confdata.Pattern_BgVideo_Vapor[0],
 	   confdata.Pattern_BgVideo_Vapor[1], confdata.Pattern_BgVideo_Vapor[2],
-	   confdata.Pattern_BgVideo_Vapor[3]); 
+	   confdata.Pattern_BgVideo_Vapor[3], confdata.Heuristic_FR_bound); 
    printf("\tCmpCrit.FR=%s, NoiseType=%s, Behavior.Prepend.DropMethod=%s\n",
 	   confdata.CmpCrit_FR==Correlation?"correlation":confdata.CmpCrit_FR==Chi_square?
 	   "chi-square":confdata.CmpCrit_FR==Intersection?"intersection":"Bhattacharyya",
@@ -336,7 +339,8 @@ void loadConf::get(bool bools[BoolCap], int ints[IntCap], char& chars, char*
 	floats[5]=confdata.Video_Duration, floats[6]=confdata.Pattern_BgVideo_Blur,
 	memcpy(floats+7, confdata.Pattern_BgVideo_Elevator, 2*sizeof(float)),
 	memcpy(floats+9, confdata.Pattern_BgVideo_Cappuccino, 6*sizeof(float)),
-	memcpy(floats+15, confdata.Pattern_BgVideo_Vapor, 4*sizeof(float));
+	memcpy(floats+15, confdata.Pattern_BgVideo_Vapor, 4*sizeof(float)),
+	floats[20]=confdata.Heuristic_FR_bound;
    crits[0]=confdata.CmpCrit_FR;
    dm=confdata.Method_Cmp_FR; tr=confdata.Method_DT;
    bgvt=confdata.Pattern_BgVideo; scal=confdata.Bright_BgMono;
@@ -669,6 +673,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
    logfSubs(conf_str[2], main_arg, logfn);
    Logger logs(logfn, pvp, mas, hist, vds, normDiff);
    Updater up(1, pvp, vds, roi, &hist, &frmUper, logs, conf_bool[2], conf_bool[1]);
+   frameRegister::setHsb(conf_float[20]);
    // End of object creation. Starts to loop.
    char keystroke; bool Esc=false, up2;
 #if defined(__linux__) || defined(__bsdi__)

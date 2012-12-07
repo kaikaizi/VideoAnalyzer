@@ -191,6 +191,9 @@ public:
 * @param myROI  ROI object
 */
    static void setROI(myROI*);
+   static void setHsb(const float& f){
+	if(f>0 && f<1)heuristicSearchBound=f;
+   }
 protected:
    CvCapture *src_cap, *dest_cap;
    IplImage *frame1, *frame2;
@@ -208,9 +211,7 @@ protected:
    const Criterion diffParam;
    frameRegister(const frameRegister&);
    const float calcDiff()throw(ErrMsg);
-   static int cmpfloat(const void* f1, const void* f2){ return
-	*reinterpret_cast<const float*>(f1) < *reinterpret_cast<const float*>(f2);
-   }
+   static float heuristicSearchBound;
 };
 
 /** @brief Resource manager (broker) for video pairs, so
