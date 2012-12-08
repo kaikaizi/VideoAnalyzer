@@ -217,7 +217,7 @@ protected:
 /** @brief Resource manager (broker) for video pairs, so
  * that top-level object (Updater) do not need to worry
  * about underlying details */
-class frameUpdater {
+class frameUpdater{
 public:
 /**
 * @brief 

@@ -504,7 +504,7 @@ frameUpdater::frameUpdater(IplImage* pfrm[2], frameSizeEq& fse, frameBuffer* fb,
 
 void frameUpdater::update(){
    do{
-	do{	   // frame query followed by frame resizer
+	do{
 	   frame1=cvQueryFrame(vp1->cap); fb->update(true);
 	   fse.update(drop1[fc1++]=++ndrop1);
 	}while(rmAdjEq && frame1 && !calcImgDiff(fse.get(true),
@@ -764,8 +764,10 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
 	frame = framePrev;   // sharing
 	memset(frame->imageData, bright, frame->imageSize);
 	for(int indx=0; indx<np; ++indx)cvWriteFrame(write, frame);
-   }
-   for(int cnt=0; cnt<vp.prop.fcount; ++cnt)
+   }else if(np<0)	// skip first -np frames
+	for(int cnt=0; cnt>np; --cnt)
+	   if(!(frame=cvQueryFrame(vp.cap)))break;
+   for(int cnt= np>=0?0:-np; cnt<vp.prop.fcount; ++cnt)
 	if((frame=cvQueryFrame(vp.cap)) && !(dropSeq&&*(dropSeq+cnt))){
 	   switch(noiseType){
 		case 1:	saltPepper(frame,*noiseLevel);   break;

@@ -377,7 +377,7 @@ mode, some frames may not be successfully retrieved (captured from video file) d
 .RE
 Integer type. Number of identical frames to be prepended in
 .BI --prepend
-mode. This number must be large enough to compensate for frame loss in the process of lossy transmission and video recapturing.
+mode. This number should be large enough to compensate for frame loss in the process of lossy transmission and video recapturing. Can also be negative to skip first few frames from the original video.
 .RS
 .I "File.Suffix.prep, File.Suffix.reg"
 .RE

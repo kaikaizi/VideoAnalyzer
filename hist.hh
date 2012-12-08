@@ -337,6 +337,7 @@ protected:
    typedef std::list<IplImage*, IplImageAllocator<IplImage*>
 	>listImage;
    typedef listImage::iterator li;
+   typedef listImage::reverse_iterator rli;
    listImage buffer1, buffer2, obuffer1, obuffer2;
    int curSize1, curSize2;
    frameSizeEq* fse;

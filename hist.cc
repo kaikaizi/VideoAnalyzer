@@ -67,8 +67,12 @@ const float calcImgDiff(const IplImage* img1, const IplImage* img2, const
 		}
 	   mav+=mav_acc/img_sz; mav_acc=0;
 	}
-	return norm==-1 ? 10*(2*log10f(255)-log10f(mav)) :	// PSNR when norm=-1
-	   pow(mav, 1./norm)*pow(img_sz, 1./norm-1);
+	/* NOTE: p-norm definition: |sum(|x_i-y_i|^p)^(1/p) substituted by
+ 	 * sum/|x_i-y_i|^p\^1
+	 *    |-----------| -
+	 *    \    N      / p */
+	return norm==-1?10*(2*log10f(255)-log10f(mav)):pow(mav,1./norm);
+	// PSNR when norm=-1
    }else if(norm==0){	   // actual inf-norm
 	float max=0;
 	for(int y=src_index=dest_index=0; y<height; ++y)
@@ -241,7 +245,7 @@ simDropFrame::simDropFrame(const int& size, const float& prob, const float& prob
 
 simDropFrame::simDropFrame(const simDropFrame& sd):size(sd.size),drop_prob(sd.drop_prob),
    cond_prob(sd.drop_prob){
-   srand(time(0));	   // force shuffle
+   srand(time(0)>>1);	   // force shuffle
    drop_array = new bool[size]; shuffle();
 }
 
@@ -424,13 +428,13 @@ void frameBuffer::setMask(const IplImage* _mask) {
 void frameBuffer::update(const bool& first) {
    const IplImage* image;
    if(fse && !(image=fse->get(first)))return;
-   li beg=++(first?buffer1:buffer2).begin();
+   li beg=(first?buffer1:buffer2).begin();
    int& curSize=first?curSize1:curSize2;
    listImage& buffer=first?buffer1:buffer2;
    if(++curSize>size && (curSize=size)){
 	if(rgbCvt)cvCvtColor(image, *buffer.begin(), CV_BGR2GRAY);
 	else memcpy((*buffer.begin())->imageData, image->imageData, image->imageSize);
-	std::rotate(buffer.begin(), beg, buffer.end());
+	std::rotate(buffer.begin(), ++beg, buffer.end());
    }else{
 	copy = cvCreateImage(cvGetSize(image), image->depth, CV_8UC1);
 	if(rgbCvt)cvCvtColor(image, copy, CV_BGR2GRAY);
@@ -445,12 +449,11 @@ const IplImage* frameBuffer::get(const int& indx, const bool& first, const
    if(indx<0 || first && indx>buffer1.size() || !first && indx>buffer2.size())
 	return 0;
    listImage::const_reverse_iterator iter;
-   int index=indx?indx-1:indx;
    if(first) {
-	if(singleChan || !rgbCvt) std::advance(iter=buffer1.rbegin(),index);
-	else std::advance(iter=obuffer1.rbegin(), index);
-   }else if(singleChan || !rgbCvt) std::advance(iter=buffer2.rbegin(), index);
-   else std::advance(iter=obuffer2.rbegin(), index);
+	if(singleChan || !rgbCvt) std::advance(iter=buffer1.rbegin(),indx);
+	else std::advance(iter=obuffer1.rbegin(), indx);
+   }else if(singleChan || !rgbCvt) std::advance(iter=buffer2.rbegin(), indx);
+   else std::advance(iter=obuffer2.rbegin(), indx);
    return *iter;
 }
 

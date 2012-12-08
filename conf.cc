@@ -84,7 +84,7 @@ void loadConf::generate()throw(ErrMsg){
    fputs("\n# Tolerance for mean gray-level of a frame to be regarded as a prepended frame\n#Bright.Tol.Mean=5\n",fd);
    fputs("\n# Tolerance for the standard deviation of gray-level of a frame to be regarded as a prepended frame\n#Bright.Tol.Sd=15\n",fd);
    fputs("\n# Stop video conversion on first unsuccessfully grabbed frame?\n#Behavior.StopConvBadFrame=true\n", fd);
-   fputs("\n# number of consecutive prepending frame when resaving video. Useful to compare lossy video encoding.\n#Num.PrependFrame=15\n", fd);
+   fputs("\n# number of consecutive prepending frame when resaving video. Useful to compare lossy video encoding.\n# When negative, the first '-p' frames of original video are skipped.\n#Num.PrependFrame=15\n", fd);
    fputs("\n# name suffix for prepended video output. e.g. prepended video for\n# \"abc.avi\" becomes \"abc_suffix.avi\", when this option is set to \"_suffix\"\n#File.Suffix.prep=_prep\n", fd);
    fputs("\n# name suffix for registered video output. Same as prepSuffix\n#File.Suffix.reg=_reg\n", fd);
    fputs("\n# file to write comparison results into. Defaults to stdout, as its\n# name suggests. \"%f\" is substituted by the file name of primary video name\n# before '-' and file extension, e.g. \"%f_lan.log\" with abc.avi uses file\n# \"abc_lan.log\" for logging.\n#File.Log=stdout\n", fd);
@@ -174,7 +174,7 @@ int loadConf::parseline(FILE* fd){
    else if(!strcmp("Prob.SuccessiveDrop",option))confdata.Prob_SuccessiveDrop=static_cast<float>(atof(value));
    else if(!strcmp("Video.Duration",option))	confdata.Video_Duration=static_cast<float>(atof(value));
    else if(!strcmp("Pattern.BgVideo.Blur",option))confdata.Pattern_BgVideo_Blur=static_cast<float>(atof(value));
-   else if(!strcmp("Heuristic.FR.Bound",option))confdata.Heuristic_FR_bound=static_cast<float>(atof(value));
+   else if(!strcmp("Heuristic.FR.bound",option))confdata.Heuristic_FR_bound=static_cast<float>(atof(value));
    else if(!strcmp("Pattern.BgVideo.Elevator",option)) parseOption(value,2,confdata.Pattern_BgVideo_Elevator);
    else if(!strcmp("Pattern.BgVideo.Cappuccino",option))parseOption(value,6,confdata.Pattern_BgVideo_Cappuccino);
    else if(!strcmp("Pattern.BgVideo.Vapor",option))parseOption(value,4,confdata.Pattern_BgVideo_Vapor);
