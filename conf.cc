@@ -450,10 +450,10 @@ void summaryPlot(const int& x_max, const Logger& log, const bool Plot){
    float ymax=0, p75;
    const char* category[]={"Dynamics #1","Dynamics #2","Difference","Hist_Corr",
 	"Hist_Chisq","Hist_Inter","Hist_Bhatt","DT_Corr","DT_Inter", "DT_Bhatt"};
-   fputs("\nSimple stats:\tMean\tSd\tMedia\t25 Perc\t 75 Perc\n", log.fd);
+   fputs("\nSimple stats:\tMean\tSd\tMedia\t25 Perc\t 75 Perc\n", log.file.fd);
    for(int indx=0; indx<LogSize; ++indx){
 	if(ymax<(p75=ss[indx].perc(.75)))ymax=p75;
-	fprintf(log.fd, "%s: %Lf\t%Lf\t%Lf\t%Lf\t%f\n", category[indx], ss[indx].mean(),
+	fprintf(log.file.fd, "%s: %Lf\t%Lf\t%Lf\t%Lf\t%f\n", category[indx], ss[indx].mean(),
 		ss[indx].sd(), ss[indx].perc(.5), ss[indx].perc(.25), p75);
    }
    if(!Plot)return;
@@ -721,6 +721,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 		   }
 		}while(vcs->getFrameDelay()==0);
 	   }else up.update(false);
+	   break;
 	}
 	printf("%s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));

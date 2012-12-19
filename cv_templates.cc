@@ -123,7 +123,7 @@ template<typename T>long double simpStat<T>::perc(const float& p) {
 
 template<typename T, template<typename,typename>class CONT>
 arrayDiff<T,CONT>::arrayDiff(const unsigned& size, const T* arr1, const T* arr2,
-	const Criterion& method, const bool& norm):size(size),normalize(norm),
+	const Criterion& method, const bool& norm):size(size),normalize(norm),b1(),b2(),
    method(method==Default? Correlation : method) {
    memset(diffVal, 0, 3*sizeof(T));
    bin1.reserve(size); bin2.reserve(size);
@@ -136,7 +136,7 @@ arrayDiff<T,CONT>::arrayDiff(const unsigned& size, const T* arr1, const T* arr2,
 
 template<typename T, template<typename,typename>class CONT>
 arrayDiff<T,CONT>::arrayDiff(const ContT& cont1, const ContT& cont2, const Criterion&
-     	method, const bool& norm):size(cont1.size()),normalize(norm),
+     	method, const bool& norm):size(cont1.size()),normalize(norm),b1(),b2(),
    method(method==Default?Correlation:method){
    memset(diffVal, 0, 3*sizeof(T));
    bin1.assign(size, 0); bin2.assign(size, 0);

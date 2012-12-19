@@ -273,7 +273,6 @@ class Logger{
 public:
    Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist& hist,
 	   VideoDFT* vd[2], const bool normVec[2])throw(ErrMsg);
-   ~Logger();
    void update();
 /**
 * @brief retrieves history data of dynamics(ID=0-1), RMSE (2)
@@ -282,16 +281,26 @@ public:
 */
    const std::vector<float>& get(const int& id)const;
 protected:
-   const char* LogFile;
    bool normVec[2];
-   FILE* fd;
+   struct File{
+	File(const char* nm)throw(ErrMsg){
+	   if(!nm)throw ErrMsg("Logger::File::ctor: log file set NULL.");
+	   if(!strcmp("stdout",nm))fd=stdout;
+	   else if(!(fd=fopen(nm,"w"))){
+		sprintf(msg,"Logger:File::ctor: Cannot open file \"%s\" for writing.", nm);
+		throw ErrMsg(msg);
+	   }
+	}
+	~File(){fclose(fd);}
+	FILE* fd;
+   }file;
    friend void summaryPlot(const int&, const Logger&, const bool);
    VideoProp *vp1, *vp2;
    Hist& hist;
    VideoDFT *dft1, *dft2;
    ARMA_Array<float> *dyn1, *dyn2, *diff;
    arrayDiff<float> histDiff;
-   arrayDiff<double>* dftDiff;
+   std::unique_ptr<arrayDiff<double> > dftDiff;
    std::vector<float> vdyn1, vdyn2, vdiff, vhist_diff1, vhist_diff2, vhist_diff3,
 	vhist_diff4, vdft_diff1,  vdft_diff3,  vdft_diff4;
 /**

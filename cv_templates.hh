@@ -83,7 +83,7 @@ void meanSdTester();
 */
 EXPORT template<typename T, template<typename ELEM, typename
 ALLOC=std::allocator<ELEM> >class CONT=std::vector>
-class arrayDiff {
+class arrayDiff{
 public:
    typedef CONT<T> ContT;
 
@@ -106,6 +106,7 @@ public:
    arrayDiff(const ContT& cont1, const ContT& cont2, const Criterion&
 	   method=Correlation, const bool& normalize=false);
 /**  @} */
+   ~arrayDiff(){dump();}
 
 /**
 * @name update
@@ -138,7 +139,8 @@ private:
 
    void meanNormalize(const bool&);
    // NOTE: only Intersection method is sensitive to scaling
-   arrayDiff(const arrayDiff&){};
+   arrayDiff(const arrayDiff&);
+   arrayDiff();
 };
 
 /**
