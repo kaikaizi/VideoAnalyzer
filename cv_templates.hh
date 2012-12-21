@@ -106,7 +106,6 @@ public:
    arrayDiff(const ContT& cont1, const ContT& cont2, const Criterion&
 	   method=Correlation, const bool& normalize=false);
 /**  @} */
-   ~arrayDiff(){dump();}
 
 /**
 * @name update
@@ -139,8 +138,7 @@ private:
 
    void meanNormalize(const bool&);
    // NOTE: only Intersection method is sensitive to scaling
-   arrayDiff(const arrayDiff&);
-   arrayDiff();
+   arrayDiff(const arrayDiff&); arrayDiff(); arrayDiff& operator=(const arrayDiff&);
 };
 
 /**

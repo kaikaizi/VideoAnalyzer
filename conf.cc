@@ -646,7 +646,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
    frameSizeEq fse(frames); frameBuffer fb(conf_int[5], &fse);
    frameRegister* pfr = !(status&0x100) && conf_bool[6] ? new frameRegister(names, conf_int[7], conf_dm,
 	   conf_tr, conf_crit[0], conf_int[4], dropSeq, normDiff, conf_bool[7], conf_int[12]) : 0;
-   Hist hist(&fse, conf_int[3], conf_bool[3], conf_int[0],0/*mask*/, cv::Size(conf_int[1], conf_int[2]));
+   Hist hist(&fse, conf_int[3], conf_bool[3], conf_int[0],0, cv::Size(conf_int[1], conf_int[2]));// mask used
    VideoDFT::DftPartitionMethod=conf_bool[11]?VideoDFT::Ring:VideoDFT::Fan;
    VideoDFT vd1(const_cast<IplImage*>(fse.get(true)), conf_tr, conf_int[6], conf_bool[4]),
 		vd2(const_cast<IplImage*>(fse.get(false)), conf_tr, conf_int[6], conf_bool[4]),
@@ -711,7 +711,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 			case VideoCtrlStream::Quit: break;
 			case VideoCtrlStream::SPACE:
 			case VideoCtrlStream::NUL:
-			    up.update(!vcs->getFrameDelay());
+							    up.update(!vcs->getFrameDelay());
 			    if(vcs->getFrameDelay()){
 				 vcs->update(vp_main.prop.posFrame, vp_sec.prop.posFrame);
 				 cvShowImage(video_str[0], fse.get(true));
@@ -720,19 +720,19 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 			default:;
 		   }
 		}while(vcs->getFrameDelay()==0);
-	   }else up.update(false);
-	   break;
+	   }
+	   else up.update(false);
 	}
 	printf("%s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));
-	summaryPlot(vp_main.prop.fcount, logs, roi);
+// 	summaryPlot(vp_main.prop.fcount, logs, roi);
 	delete psdf; delete pfr; delete roi; delete vcs;
 	cvReleaseCapture(&cap_main); cvReleaseCapture(&cap_sec);
    }catch(const ErrMsg& err){
 	if(err.errnos()==1){
 	   printf("%s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		   frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));
-	   summaryPlot(vp_main.prop.fcount, logs, roi);
+// 	   summaryPlot(vp_main.prop.fcount, logs, roi);
 	}
 	delete psdf; delete pfr; delete roi; delete vcs;
 	cvReleaseCapture(&cap_main); cvReleaseCapture(&cap_sec);

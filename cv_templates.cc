@@ -190,7 +190,7 @@ void arrayDiff<T,CONT>::update(const ContT& cont1, const ContT& cont2, const boo
 
 template<typename T, template<typename,typename>class CONT>
 void arrayDiff<T,CONT>::dump()const {
-   puts("\n------------arrayDiff------------");
+   puts("\n------------arrayDiff------------");fflush(stdout);
    printf("Container #1(%u):\n", size);
    std::copy(bin1.begin(), bin1.end(), std::ostream_iterator<T>(std::cout, " "));
    std::cout<<"\nMean="<<mean[0]<<std::endl;

@@ -545,11 +545,10 @@ void frameUpdater::dump()const {
 }
 
 //++++++++++++++++++++++++++++++++++++++++
-
 Logger::Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist&
 	hist, VideoDFT* vd[2], const bool nv[2])throw(ErrMsg):file(log),vp1(vp[0]),
-   vp2(vp[1]),dyn1(ma[0]),dyn2(ma[1]),diff(ma[2]),hist(hist),dft1(vd[0]),
-   dft2(vd[1]),histDiff(hist.get(true), hist.get(false),Default, normVec[0]=nv[0]),
+   vp2(vp[1]),hist(hist),dft1(vd[0]),dft2(vd[1]),dyn1(ma[0]),dyn2(ma[1]),diff(ma[2]),
+   histDiff(hist.get(true), hist.get(false),Default, normVec[0]=nv[0]),
    bufRec(0){
    if(!vp1 || !vp2)  throw ErrMsg("Logger::ctor: VideoProp set NULL.");
    if(!dyn1 || !dyn2 || !diff)throw ErrMsg("Logger::ctor: Dynamic/Diff set NULL.");

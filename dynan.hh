@@ -274,6 +274,7 @@ public:
    Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist& hist,
 	   VideoDFT* vd[2], const bool normVec[2])throw(ErrMsg);
    void update();
+//    ~Logger(){puts("Dtor");fflush(stdout);}
 /**
 * @brief retrieves history data of dynamics(ID=0-1), RMSE (2)
 * histogram difference (ID=3-6), DFT difference (ID=7-9, no Chi-square).
