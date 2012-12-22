@@ -138,7 +138,7 @@ private:
 
    void meanNormalize(const bool&);
    // NOTE: only Intersection method is sensitive to scaling
-   arrayDiff(const arrayDiff&); arrayDiff(); arrayDiff& operator=(const arrayDiff&);
+   arrayDiff(arrayDiff&); arrayDiff(); arrayDiff& operator=(arrayDiff&);
 };
 
 /**

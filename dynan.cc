@@ -503,17 +503,16 @@ frameUpdater::frameUpdater(IplImage* pfrm[2], frameSizeEq& fse, frameBuffer* fb,
 }
 
 void frameUpdater::update(){
-   assert(rmAdjEq);
    do{
 	do{
 	   if(!(frame1=cvQueryFrame(vp1->cap)))break;
 	   fb->update(true); fse.update(drop1[fc1++]=++ndrop1);
 	}while(rmAdjEq && !calcImgDiff(fb->get(0,true),fb->get(1,true),
 		   mask,-2));
-	do{	// NOTE: had to add fc>2 constraint Y?
+	do{	// NOTE: had to add fc2>2 constraint Y?
 	   if(!(frame2=cvQueryFrame(vp2->cap)))break;
 	   fb->update(false); fse.update(!(drop2[fc2++]=++ndrop2));
-	}while(rmAdjEq && fc2>2 && !calcImgDiff(fb->get(0,false),
+	}while(rmAdjEq && !calcImgDiff(fb->get(0,false),
 		   fb->get(1,false),mask,-2));
 	--ndrop1, --ndrop2;
 	// simDropFrame affects only the secondary video
@@ -545,17 +544,18 @@ void frameUpdater::dump()const {
 }
 
 //++++++++++++++++++++++++++++++++++++++++
+/* */
 Logger::Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist&
 	hist, VideoDFT* vd[2], const bool nv[2])throw(ErrMsg):file(log),vp1(vp[0]),
-   vp2(vp[1]),hist(hist),dft1(vd[0]),dft2(vd[1]),dyn1(ma[0]),dyn2(ma[1]),diff(ma[2]),
-   histDiff(hist.get(true), hist.get(false),Default, normVec[0]=nv[0]),
+    vp2(vp[1]),hist(hist),dft1(vd[0]),dft2(vd[1]),dyn1(ma[0]),dyn2(ma[1]),diff(ma[2]),
+    histDiff(hist.get(true), hist.get(false),Default, normVec[0]=nv[0]),
    bufRec(0){
-   if(!vp1 || !vp2)  throw ErrMsg("Logger::ctor: VideoProp set NULL.");
-   if(!dyn1 || !dyn2 || !diff)throw ErrMsg("Logger::ctor: Dynamic/Diff set NULL.");
-   if(!dft1 || !dft2)throw ErrMsg("Logger::ctor: VideoDFT set NULL.");
-   dftDiff = std::unique_ptr<arrayDiff<double> >(new
-	   arrayDiff<double>(dft1->getEnergyDist(), dft2->getEnergyDist(),
-	   Default, normVec[1]=nv[1]));
+	if(!vp1 || !vp2)  throw ErrMsg("Logger::ctor: VideoProp set NULL.");
+	if(!dyn1 || !dyn2 || !diff)throw ErrMsg("Logger::ctor: Dynamic/Diff set NULL.");
+	if(!dft1 || !dft2)throw ErrMsg("Logger::ctor: VideoDFT set NULL.");
+	dftDiff = std::unique_ptr<arrayDiff<double> >(new
+		arrayDiff<double>(dft1->getEnergyDist(), dft2->getEnergyDist(),
+		Default, normVec[1]=nv[1]));
    fputs("Index1\tIndex2\tDyn1\tDyn2\tDiff\tHist_Corr\tHist_Chisq\t"
 	   "Hist_Inter\tHist_Bhatta\tDT_Corr\tDT_Inter\tDT_Bhatta\n",file.fd);
    vdyn1.reserve(vp[0]->prop.fcount); vdyn2.reserve(vp[0]->prop.fcount);
@@ -569,7 +569,7 @@ void Logger::update(){
    fprintf(file.fd,"%d\t%d\t", vp1->prop.posFrame, vp2->prop.posFrame);   // frame pos
    double ff[]={dyn1->get_val(), dyn2->get_val(), diff->get_val(), histDiff.diff(Correlation),
 	histDiff.diff(Chi_square), histDiff.diff(Intersection), histDiff.diff(Bhattacharyya),
-	dftDiff->diff(Correlation), dftDiff->diff(Intersection), dftDiff->diff(Bhattacharyya)};
+   dftDiff->diff(Correlation), dftDiff->diff(Intersection), dftDiff->diff(Bhattacharyya)};
    // NUMERICAL problem with f7: non-zero when den==num
    for(int indx=0; indx<3; ++indx)fprintf(file.fd,"%.2f\t",ff[indx]);
    for(int indx=3; indx<10;++indx)fprintf(file.fd,"%.4g\t",ff[indx]);
@@ -577,7 +577,7 @@ void Logger::update(){
    if(++bufRec>=bufRecCap && !(bufRec=0)) fflush(file.fd);
    // Always set both vectors with same mean when copying to object histDiff/dftDiff
    histDiff.update(hist.get(true), hist.get(false), normVec[0]);
-   // Normalized histogram/DFT difference
+//    Normalized histogram/DFT difference
    dftDiff->update(dft1->getEnergyDist(), dft2->getEnergyDist(), normVec[1]);
    vdyn1.push_back(ff[0]); vdyn2.push_back(ff[1]); vdiff.push_back(ff[2]);
    vhist_diff1.push_back(ff[3]); vhist_diff2.push_back(ff[4]);

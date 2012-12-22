@@ -448,19 +448,16 @@ ffmpeg(1), opencv
 
 .SH BUGS
 .I 1.
-Segmentation fault on exit.
-.sp
-.I 2.
 In
 .BI --gen-video
 mode, when generating randomly-moving subjects, the first frame may contain objects that disappear in later frames, so that the generated video contains less objects than specified via
 .I Num.VideoObj
 option.
 .sp
-.I 3.
+.I 2.
 Core dumps when outputting video format is recognized by OpenCV but not supported or buggy. Suspect that OpenCV is liable.
 .sp
-.I 4.
+.I 3.
 Please file a bug report and send to me when you catch one.
 .SH AUTHOR
 Liu Lukai (liulukai@gmail.com)

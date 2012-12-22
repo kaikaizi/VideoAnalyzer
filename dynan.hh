@@ -274,12 +274,11 @@ public:
    Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist& hist,
 	   VideoDFT* vd[2], const bool normVec[2])throw(ErrMsg);
    void update();
-//    ~Logger(){puts("Dtor");fflush(stdout);}
-/**
-* @brief retrieves history data of dynamics(ID=0-1), RMSE (2)
-* histogram difference (ID=3-6), DFT difference (ID=7-9, no Chi-square).
-* @return retrieved vector stored so far
-*/
+   /**
+    * @brief retrieves history data of dynamics(ID=0-1), RMSE (2)
+    * histogram difference (ID=3-6), DFT difference (ID=7-9, no Chi-square).
+    * @return retrieved vector stored so far
+    */
    const std::vector<float>& get(const int& id)const;
 protected:
    bool normVec[2];
@@ -297,19 +296,19 @@ protected:
    }file;
    friend void summaryPlot(const int&, const Logger&, const bool);
    VideoProp *vp1, *vp2;
-   Hist& hist;
    VideoDFT *dft1, *dft2;
+   Hist& hist;
    ARMA_Array<float> *dyn1, *dyn2, *diff;
    arrayDiff<float> histDiff;
    std::unique_ptr<arrayDiff<double> > dftDiff;
    std::vector<float> vdyn1, vdyn2, vdiff, vhist_diff1, vhist_diff2, vhist_diff3,
 	vhist_diff4, vdft_diff1,  vdft_diff3,  vdft_diff4;
-/**
-* @name Logger file output buffer size, in unit of record/line
-* @{ */
+   /**
+    * @name Logger file output buffer size, in unit of record/line
+    * @{ */
    const static size_t bufRecCap=16;
    size_t bufRec;
-/**  @} */
+   /**  @} */
 };
 
 template<typename T>class drawBars;

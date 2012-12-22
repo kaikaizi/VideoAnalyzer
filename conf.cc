@@ -466,7 +466,7 @@ void summaryPlot(const int& x_max, const Logger& log, const bool Plot){
    Plot2D plot(cv::Size(800,600), dims, cv::Scalar(0), cv::Scalar(255,255,255));
    cv::Scalar fg[]={ // Dynamics, difference
 	cv::Scalar(128,100,200), cv::Scalar(128,100,180), cv::Scalar(200,100,128),
-     	cv::Scalar(128,0,200), cv::Scalar(128,0,200), cv::Scalar(200,0,128), cv::Scalar(250,50,155),
+	cv::Scalar(128,0,200), cv::Scalar(128,0,200), cv::Scalar(200,0,128), cv::Scalar(250,50,155),
 	cv::Scalar(200,20,200), cv::Scalar(200,60,100), cv::Scalar(200,80,150), cv::Scalar(250,150,155)};
    int thick[]={1,1,1, 2,2,2,2, 1,1,1,1};
    for(int indx=0; indx<LogSize; ++indx)
@@ -671,8 +671,9 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
    // substitution for logging file
    char logfn[strlen(conf_str[2])+strlen(main_arg)+1];
    logfSubs(conf_str[2], main_arg, logfn);
-   Logger logs(logfn, pvp, mas, hist, vds, normDiff);
-   Updater up(1, pvp, vds, roi, &hist, &frmUper, logs, conf_bool[2], conf_bool[1]);
+   Logger* logs=new Logger(logfn, pvp, mas, hist, vds, normDiff);	// Note: not deleting logs avoid segfault,
+											// don't know why.
+   Updater up(1, pvp, vds, roi, &hist, &frmUper, *logs, conf_bool[2], conf_bool[1]);
    frameRegister::setHsb(conf_float[20]);
    // End of object creation. Starts to loop.
    char keystroke; bool Esc=false, up2;
@@ -725,14 +726,14 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 	}
 	printf("%s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));
-// 	summaryPlot(vp_main.prop.fcount, logs, roi);
+	summaryPlot(vp_main.prop.fcount, *logs, roi);
 	delete psdf; delete pfr; delete roi; delete vcs;
 	cvReleaseCapture(&cap_main); cvReleaseCapture(&cap_sec);
    }catch(const ErrMsg& err){
 	if(err.errnos()==1){
 	   printf("%s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		   frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));
-// 	   summaryPlot(vp_main.prop.fcount, logs, roi);
+	   summaryPlot(vp_main.prop.fcount, *logs, roi);
 	}
 	delete psdf; delete pfr; delete roi; delete vcs;
 	cvReleaseCapture(&cap_main); cvReleaseCapture(&cap_sec);
