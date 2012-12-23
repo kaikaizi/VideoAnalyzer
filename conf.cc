@@ -89,6 +89,7 @@ void loadConf::generate()throw(ErrMsg){
    fputs("\n# name suffix for registered video output. Same as prepSuffix\n#File.Suffix.reg=_reg\n", fd);
    fputs("\n# file to write comparison results into. Defaults to stdout, as its\n# name suggests. \"%f\" is substituted by the file name of primary video name\n# before '-' and file extension, e.g. \"%f_lan.log\" with abc.avi uses file\n# \"abc_lan.log\" for logging.\n#File.Log=stdout\n", fd);
    fputs("\n# Video codec for AVI container in saving video format. Also used by self-testing video-extension. Alternatives supported by\n# OpenCV are: PIM1 -- MPEG-1; MJPG -- motion-jpeg; MP42 -- MPEG4.2;\n# DIV3 -- MPEG4.3; U263 -- H263; I263 -- H263I; FLV1 -- FLV1; IYUV -- default; XVID; DIVX; H264\n#File.VideoCodec=MJPG\n", fd);
+   fputs("\n# Mask file location. Leave empty to avoid loading mask\nFile.Mask=\n", fd);
    fputs("\n# Moving average order of dynamic of two videos under study\n#num.MA=1\n", fd);
    fputs("\n# Frame per sec when playing videos. Due to computational burden, typically actual FPS < half of given number\n#Show.FPS=10\n", fd);
    fputs("\n# Type of additive noise polluted to each frame before prepending frame and saving video to a file.\n# Alternatives are: none, salt-peper, gaussian, duplicate.\n#Noise.Type=none\n", fd);
@@ -106,7 +107,8 @@ loadConf::confData::confData():conf_bools(0xff0),Shape_Hist_Gap(3),Shape_Hist_Ba
    CmpCrit_FR(Correlation),Method_DT(VideoDFT::DFT),Method_Cmp_FR(frameRegister::FrameDiff){
    memset(File_Suffix_prep,0,strCap); memset(File_Suffix_reg,0,strCap);
    memset(File_Log,0,strCap); memset(File_VideoCodec,0,5); memset(File_BgImage,0,strCap);
-   memset(File_VideoExtension,0,strCap); memset(Noise_Level,3,sizeof(float));
+   memset(File_VideoExtension,0,strCap); memset(File_Mask,0,strCap);
+   memset(Noise_Level,3,sizeof(float));
    strcpy(File_Suffix_prep,"_prep"); strcpy(File_Suffix_reg,"_reg");
    strcpy(File_Log,"stdout"); strcpy(File_VideoCodec,"DIV3");
    strcpy(File_VideoExtension,"animate");
@@ -122,9 +124,10 @@ loadConf::loadConf(const char* name, const bool& use_default)throw(ErrMsg):fname
    else{
 	FILE* fd=fopen(name,"r");
 	if(!fd){
-	   sprintf(msg,"loadConf::ctor: cannot open conf file  \"%s\" for reading.\n", fname); throw ErrMsg(msg);
+	   sprintf(msg,"loadConf::ctor: cannot open conf file  \"%s\" for reading.\n",
+		   fname); throw ErrMsg(msg);
 	}
-	line = new char[lineCap];
+	line = new char[lineCap+1];
 	while(parseline(fd));
 	fclose(fd); delete[]line;
    }
@@ -132,7 +135,7 @@ loadConf::loadConf(const char* name, const bool& use_default)throw(ErrMsg):fname
 
 int loadConf::parseline(FILE* fd){
    if(getline(&line, &lineCap, fd)==-1)return 0;
-   char *pch=index(line,'#');
+   char *pch=strchr(line,'#');
    if(line==pch||line[0]=='\n')return ++lineNumber;   // empty line
    if(pch)*pch=0;
    char* option=strtok(line," =\n\t"), *value=strtok(0," =\n\t");
@@ -238,7 +241,8 @@ int loadConf::parseline(FILE* fd){
 	// No need/way to manually set codec option
 	strcpy(VideoRegister::Codec, confdata.File_VideoCodec);
 	strcpy(createAnimation::Codec, confdata.File_VideoCodec);
-   }else if(!strcmp("Noise.Type",option)){
+   }else if(!strcmp("File.Mask",option))strcpy(confdata.File_Mask,value);
+   else if(!strcmp("Noise.Type",option)){
 	if(!strcasecmp("none",value))			confdata.Noise_Type = 0;
 	else if(!strcasecmp("salt-pepper",value))	confdata.Noise_Type = 1;
 	else if(!strcasecmp("gaussian",value))	confdata.Noise_Type = 2;
@@ -303,9 +307,9 @@ void loadConf::dump()const{
 	   VideoDFT::DFT?"DFT":confdata.Method_DT==VideoDFT::DCT?"DCT":"DWT",
 	   confdata.conf_bools[11]?"Ring":"Fan");
    printf("\tFile.Suffix.prep=\"%s\", File.Suffix.reg=\"%s\", File.Log=\"%s\", File.VideoCodec=\"%s\""
-	   "File.BgImage=\"%s\", File.VideoExtension=\"%s\"\n", confdata.File_Suffix_prep,
+	   "File.BgImage=\"%s\", File.VideoExtension=\"%s\", File.Mask=\"%s\"\n", confdata.File_Suffix_prep,
 	   confdata.File_Suffix_reg, confdata.File_Log, confdata.File_VideoCodec,
-	   confdata.File_BgImage, confdata.File_VideoExtension);
+	   confdata.File_BgImage, confdata.File_VideoExtension, confdata.File_Mask);
    printf("\tPattern.BgVideo=\"%s\", Bright.Mono=[%.0f %.0f %.0f]\n",
 	   confdata.Pattern_BgVideo==createAnimation::None?"None":(confdata.Pattern_BgVideo==createAnimation::Blur?
 		"Blur":confdata.Pattern_BgVideo==createAnimation::Elevator?"Elevator":"Cappuccino"),
@@ -333,7 +337,8 @@ void loadConf::get(bool bools[BoolCap], int ints[IntCap], char& chars, char*
 	str[2]=const_cast<char*>(confdata.File_Log),
 	str[3]=const_cast<char*>(confdata.File_VideoCodec),
 	str[4]=const_cast<char*>(confdata.File_BgImage),
-	str[5]=const_cast<char*>(confdata.File_VideoExtension);
+	str[5]=const_cast<char*>(confdata.File_VideoExtension),
+	str[6]=const_cast<char*>(confdata.File_Mask);
    floats[0]=confdata.Prob_FrameDrop, floats[1]=confdata.Prob_SuccessiveDrop,
 	memcpy(floats+2, confdata.Noise_Level, 3*sizeof(float)),
 	floats[5]=confdata.Video_Duration, floats[6]=confdata.Pattern_BgVideo_Blur,
@@ -652,6 +657,17 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 		vd2(const_cast<IplImage*>(fse.get(false)), conf_tr, conf_int[6], conf_bool[4]),
 		*vds[]={&vd1, &vd2};
    myROI* roi=0; VideoCtrlStream* vcs=0;
+   if(*conf_str[6]){	// load mask data
+	FILE* fp=fopen(conf_str[6],"r");
+	if(!fp)
+	   fprintf(stderr,"Warning: cannot open mask data file \"%s\" for read.\n", conf_str[6]);
+	else try{
+	   roi=new myROI(roiMask, frames, video_str, true);
+	   roi->read(fp);
+	}catch(const ErrMsg& ex){
+	   delete roi; delete pfr; delete psdf; throw;
+	}
+   }
    if(conf_bool[0]){	// silence/disable images for diff-mode
 	setIplImage(roiMask=cvCreateImage(cvGetSize(fse.get(true)),
 		   fse.get(true)->depth, CV_8UC1));

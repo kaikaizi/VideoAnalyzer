@@ -251,7 +251,7 @@ protected:
    static int w1, w2;	// track pixel brightness with right mouse down;
    static int x, y, wid;   // and focused window id
    static myROI* roi;
-   static char fname[32], watermark[64];
+   static char fname[64], watermark[64];
    friend void MouseCallback(int, int, int, int, void*);
    const char* wn1, *wn2;
    short frameDelay, curFrameDelay, histIndex;

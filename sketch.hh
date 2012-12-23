@@ -17,7 +17,6 @@
 #pragma once
 #include <cv.h>
 #include <highgui.h>
-#include <deque>
 #include <map>
 #include "hist.hh"
 
@@ -59,17 +58,12 @@ public:
 * @brief Ctor: create a local copy of image when specified,
 * on which to draw stuffs
 * @param mat Source image; make a local copy if specified
-* @param _objID Class ID, used to identify derived classes
-* @param lc Line color (brightness) for dash/solid line
-* drawing
 * @param alloc should a local copy of "mat" be made?
 * @throw ErrMsg issues error when source image NULL or
 * cannot make local copy when specified.
 */
-   readWrite(cv::Mat* mat, const char _objID, const cv::Scalar&
-	   lc=170, const bool& alloc=false)throw(ErrMsg);
-   readWrite(IplImage* ipl, const char _objID, const cv::Scalar&
-	   lc=170, const bool& alloc=false)throw(ErrMsg);
+   readWrite(cv::Mat* mat, const bool& alloc=false)throw(ErrMsg);
+   readWrite(IplImage* ipl, const bool& alloc=false)throw(ErrMsg);
    ~readWrite();
 /**  @} */
 /**
@@ -79,8 +73,8 @@ public:
 * @brief File interface for derived object details
 * @param std::fstream
 */
-   virtual void write(std::fstream*)=0;
-   virtual void read(std::fstream*)=0;
+   virtual void write(FILE*)throw(ErrMsg)=0;
+   virtual void read(FILE*)throw(ErrMsg)=0;
 /**  @} */
 /**
 * @brief Force update processing
@@ -92,53 +86,9 @@ public:
    virtual void dump()const=0;
 protected:
    cv::Mat* region;
-   const cv::Scalar lineColor;
-   static const char obj_delim, field_delim, *err_msg_io, *err_msg_format,
-		    *err_msg_unknown;
-   const char objID;
-   inline const bool ioChecker(std::fstream*)const;	// finalized
-   inline const bool seekp(std::fstream*, const char&)const;	// ofstream
-   inline const bool seekg(std::fstream*, const char&)const;	// ifstream
-   template<typename T>			// T can be vector/deque/list/etc.
-	void writeArray(std::fstream*, const typename T::iterator&,
-		const typename T::iterator&);
-   template<typename T1, typename T2=float>
-	void readArray(std::fstream*, T1&, const typename T1::iterator&,
-		const typename T1::iterator&)throw(ErrMsg);
+   static const char delim[2];
 private:
    const bool self_alloc;	// set if ctor 'new''s region ptr
-   const bool seek(std::fstream*, const char&)const;
-};
-
-/**
-* @brief Storage for vertices of polygon ROI. Currently not
-* in use
-*/
-class bufferedArray: public readWrite {
-public:
-/**
-* @{ */
-   bufferedArray(const float* arr, const unsigned& arr_sz, cv::Mat*
-	   pcanvas, const float& rat, const cv::Scalar& lc);
-   bufferedArray(const float* arr, const unsigned& arr_sz,
-	   IplImage*pcanvas, const float& rat, const cv::Scalar& lc);
-/**  @} */
-   void addElem(const float&);
-   void append(const float*, const unsigned&);
-   inline const unsigned& getSize()const;
-   inline const std::deque<float>& getArray()const;
-   void update();   // force re-calc & re-drawing all data points
-   void dump()const;
-   void write(std::fstream*);
-   void read(std::fstream*);
-private:
-   std::deque<float> data_array;
-   std::deque<cv::Point> pt_array;
-   const int canvas_width, canvas_height;
-   unsigned drawFront;		// front-end index of data for curve drawing
-   const float disp_ratio;
-   static const char *exRscope, *exWscope;
-   void init(const float*);
 };
 
 /**
@@ -162,17 +112,7 @@ public:
    myROI(IplImage* pmat, IplImage* src[2], const char*const wns[2],
 	   const bool& enable_redraw=true);
    ~myROI();
-   const cv::Mat* getPolyMat()const{return region;}
-/**
-* @brief Closes polygon and inits a flash (via changing
-* interal state to notify member function update())
-*/
-   void getROI();
-/**
-* @brief Gives a brief flash (swap of frame and filled
-* polygon and back) when ROI selection completed
-*/
-   void update();
+   const cv::Mat* getPolyMat()const{return ready?0:region;}
 /**
 * @brief Prints polygon vertices
 */
@@ -180,23 +120,28 @@ public:
 /**
 * @name File IO for polygon state. Not used.
 * @{ */
-   void write(std::fstream*);
-   void read(std::fstream*);
+   void write(FILE*)throw(ErrMsg);
+   void read(FILE*)throw(ErrMsg);
 /**  @} */
+/**
+* @brief Gives a brief flash (swap of frame and filled
+* polygon and back) when ROI selection completed
+*/
+   void update();
 protected:
    friend void roiMouseCallBack(const int*, myROI&);
    cv::Mat *psrc, *psrc2;
    const cv::Size imgSz;
-   std::deque<cv::Point> pt_poly;
-   std::deque<std::vector<unsigned char> > lines_gray1, lines_gray2;
-   std::deque<std::vector<cv::Vec3b> > lines_color1, lines_color2;
+   std::vector<cv::Point> pt_poly;
+   std::vector<std::vector<unsigned char> > lines_gray1, lines_gray2;
+   std::vector<std::vector<cv::Vec3b> > lines_color1, lines_color2;
    bool pPoly_updated, redrawable;
    const bool self_alloc, gray;
    cv::Point* pt_array;
    char *wn1, *wn2;
    typedef enum{off, state1, state2} FlashState;
    FlashState flash;
-   static const char *exRscope, *exWscope;
+   bool ready;
    void pushLine(const bool);
    void redrawLine()throw(ErrMsg);
 /**  @} */
@@ -210,6 +155,15 @@ protected:
 * @brief Resets polygon ROI selection
 */
    void clear();
+/**
+* @brief Closes polygon and inits a flash (via changing
+* interal state to notify member function update())
+*/
+   void getROI();
+private:
+   static bool chkConvexPolygon(std::vector<cv::Point>);
+   static double deg(const cv::Point&, const cv::Point&,
+	   const cv::Point&);
 };
 
 /**
@@ -294,7 +248,6 @@ protected:
    std::vector<long> binCnt;
    std::vector<double> energyDist;
    std::vector<int> index;
-   static const char *exRscope, *exWscope;
    void init();
 };
 

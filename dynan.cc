@@ -19,6 +19,7 @@
 #include <ctime>
 #include <iostream>
 #include <boost/foreach.hpp>
+#define For BOOST_FOREACH
 
 extern char msg[256];
 //++++++++++++++++++++++++++++++++++++++++
@@ -544,7 +545,7 @@ void frameUpdater::dump()const {
 }
 
 //++++++++++++++++++++++++++++++++++++++++
-/* */
+
 Logger::Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist&
 	hist, VideoDFT* vd[2], const bool nv[2])throw(ErrMsg):file(log),vp1(vp[0]),
     vp2(vp[1]),hist(hist),dft1(vd[0]),dft2(vd[1]),dyn1(ma[0]),dyn2(ma[1]),diff(ma[2]),
@@ -602,8 +603,6 @@ const std::vector<float>& Logger::get(const int& id)const{
 
 //++++++++++++++++++++++++++++++++++++++++
 
-std::string Updater::fn;
-std::fstream* Updater::pfs;
 double Updater::tickFreq = cv::getTickFrequency();
 bool Updater::firstCall=true;
 
@@ -620,73 +619,21 @@ Updater::Updater(const short& cnt, VideoProp** _vp, VideoDFT** _vd, myROI* _roi,
 	for(int indx=0; indx<frameNum; ++indx)vd_vec.push_back(_vd[indx]);
 	if(showBar) dftBar = new drawBars<std::vector<double> >(cvSize(380, 120));
    }
-   std::fstream fs("na", std::ios_base::in);// yes, I know it fails and 
-   pfs = &fs;	// goes out of scope; just to point to sth
-   if(pfs->is_open())pfs->close();
 }
 
 Updater::~Updater() {
-   // use fn as fclose condition checker
-   if(!fn.empty())pfs->close();
    if(dftBar)delete dftBar;
-}
-
-void Updater::setFileName(const char* str) {
-   fn=*str;
-   if(pfs->is_open())pfs->close();
-   pfs->open(fn.c_str(), std::ios_base::in|std::ios_base::out);
-   // sets stream exception triggering
-   pfs->exceptions(std::ios_base::eofbit|std::ios_base::failbit
-	   |std::ios_base::badbit);   
-}
-
-void Updater::setFileName(const std::string& str) {
-   fn=str;
-   if(pfs->is_open())pfs->close();
-   pfs->open(fn.c_str(), std::ios_base::in|std::ios_base::out);
-   pfs->exceptions(std::ios_base::eofbit|std::ios_base::failbit
-	   | std::ios_base::badbit);
-}
-
-void Updater::read(){	// call setFileName before read/write
-   if(!pfs || !*pfs) {
-	fprintf(stderr, "Update::read: pfs=NULL or not opened\n"); return;
-   }
-   pfs->seekp(std::ios_base::beg);	// header checker
-   time_t cur_time; char delim;
-   (*pfs)>>cur_time>>delim;
-   if(delim!=0x0) {
-	sprintf(msg, "Updater::read::header: tm=%ju <%s>, delim=%d!=0.\n",
-		static_cast<uintmax_t>(cur_time), asctime(localtime(&cur_time)),
-		static_cast<int>(delim));
-	throw ErrMsg(msg);
-   }else printf("File created on %s\n\n", asctime(localtime(&cur_time)));
-   if(!vd_null)BOOST_FOREACH(VideoDFT* i,vd_vec)i->read(pfs);
-   if(roi)	roi->read(pfs);
-   pfs->flush();
-}
-
-void Updater::write() {
-   if(!pfs || !*pfs) {
-	fprintf(stderr, "Update::read: pfs=NULL or not opened\n"); return;
-   }
-   pfs->seekp(std::ios_base::beg);
-   time_t curtime = time(NULL);
-   (*pfs)<<curtime<<static_cast<char>(0x0);
-   if(!vd_null)BOOST_FOREACH(VideoDFT* i,vd_vec)i->write(pfs);
-   if(roi) roi->write(pfs);
-   pfs->flush();
 }
 
 void Updater::update(const bool& locked, const bool& log) {
    if(roi)roi->update();
    if(!locked) {
-	if(!vp_null)BOOST_FOREACH(VideoProp* i, vp_vec)i->update();
+	if(!vp_null)For(VideoProp* i, vp_vec)i->update();
 	if(fu)fu->update();
 	if(log && !firstCall)logs.update();
 	if(hist)hist->update();
 	if(!vd_null){
-	   BOOST_FOREACH(VideoDFT* i, vd_vec)i->update();
+	   For(VideoDFT* i, vd_vec)i->update();
 	   if(showBar)cv::imshow("DftBars", dftBar->draw(vd_vec[0]->getEnergyDist(),
 			vd_vec[1]->getEnergyDist()));
 	   if(showDft){
@@ -700,7 +647,7 @@ void Updater::update(const bool& locked, const bool& log) {
 }
 
 void Updater::dump()const {
-   if(!vd_null)BOOST_FOREACH(VideoDFT* i, vd_vec)i->dump();
+   if(!vd_null)For(VideoDFT* i, vd_vec)i->dump();
    if(roi)roi->dump();	if(hist)hist->dump();
 }
 

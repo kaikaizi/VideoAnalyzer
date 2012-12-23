@@ -18,8 +18,9 @@
 #include "sketch.hh"
 #include "hist.hh"
 #include "conf.hh"
-#include <fstream>
 #include <iterator>
+#include <boost/foreach.hpp>
+#define For BOOST_FOREACH
 
 void dashLine(cv::Mat& mat, const cv::Point& from, const cv::Point& to) {
    cv::LineIterator iter(mat, from, to);
@@ -50,16 +51,39 @@ void roiMouseCallBack(const int* params, myROI& roi) {
 // 2: remove a point; 3: pass ROI to Hist and clear;
    if(*params==1) {
 	roi.pushPoint(cv::Point(*(params+1), *(params+2)));
-	fprintf(stderr,"Point [%d, %d] added.\n", *(params+1), *(params+2));
+	fprintf(stderr,"[%d, %d] added.\n", *(params+1), *(params+2));
    }else if(*params==2) {
 	const cv::Point &last=roi.popPoint();
-	if(last.x>=0)fprintf(stderr, "Previous point[%d %d] removed.\n",
+	if(last.x>=0)fprintf(stderr, "[%d %d] removed.\n",
 		last.x, last.y);
    }else if(*params==3) {
+	if(roi.pt_poly.size()<2){  // also check for other conds?
+	   fputs("Warning: roiMouseCB::invalid polygon\n", stderr);
+	   return;
+	}
+	if(!myROI::chkConvexPolygon(roi.pt_poly))
+	   fputs("\nWarning: roiMouseCB:: concave polygon\n", stderr);
 	Hist::setMask(roi.getPolyMat());
 	IplImage mask = *(roi.getPolyMat());
 	frameBuffer::setMask(&mask);
-	roi.clear();
+	fputs("File name to save image mask: ", stderr);
+	char fname[64]; int len;
+	if(!fgets(fname, 32, stdin) || 1==(len=strlen(fname))){
+	   fputs("\nfgets failed or no input.\n Mask not saved.",stderr);
+	   roi.clear(); return;	// making mask-selection an no-op
+	}
+	fname[strlen(fname)-1]=0;
+	if(strcmp(fname+strlen(fname)-4,".msk")) strcat(fname,".msk");
+	FILE* fp;
+	if((fp=fopen(fname,"r"))){
+	   fprintf(stderr,"Warning: %s already exists.\n", fname);
+	   fclose(fp);
+	}
+	if(!(fp=fopen(fname, "w"))){
+	   sprintf(msg, "roiMouseCallBack: cannot write to file %s\n", fname);
+	   throw ErrMsg(msg);
+	}
+	roi.ready=true; roi.write(fp); roi.clear();
    }else roi.getROI();
 }
 
@@ -74,22 +98,14 @@ ErrMsg::ErrMsg(const std::string& _msg, const int& id):Errno(id){
 }
 
 // ++++++++++++++++++++++++++++++++++++++++
-// readWrite: obj_delim=0, field_delim=1;
-
-const char readWrite::obj_delim=0, readWrite::field_delim=1;
-
-const char* readWrite::err_msg_io="ios Exception encountered in ",
-	*readWrite::err_msg_unknown="Unknown error raised in ",
-	*readWrite::err_msg_format="Format error: ";
-
-readWrite::readWrite(cv::Mat* mat, const char _objID, const cv::Scalar& lc, const
-	bool& alloc)throw(ErrMsg):lineColor(lc),objID(_objID),self_alloc(alloc),
-   region(mat&&self_alloc?(new cv::Mat(*mat)):mat) {
+// readWrite
+const char readWrite::delim[2]="\1";
+readWrite::readWrite(cv::Mat* mat, const bool& alloc)throw(ErrMsg):
+   self_alloc(alloc),region(mat&&self_alloc?(new cv::Mat(*mat)):mat) {
    if(!region)throw ErrMsg("readWrite::ctor: Mat data cannot be NULL.\n");
 }
 
-readWrite::readWrite(IplImage* ipl, const char _objID, const cv::Scalar& lc, const
-	bool& alloc)throw(ErrMsg):lineColor(lc),objID(_objID),self_alloc(alloc){
+readWrite::readWrite(IplImage* ipl, const bool& alloc)throw(ErrMsg):self_alloc(alloc){
    if(self_alloc) region = new cv::Mat(ipl);
    else region = new cv::Mat(ipl);	// TODO: ???
    if(!region) throw ErrMsg("readWrite::ctor: Mat data cannot be NULL.\n");
@@ -97,261 +113,18 @@ readWrite::readWrite(IplImage* ipl, const char _objID, const cv::Scalar& lc, con
 
 readWrite::~readWrite(){if(self_alloc)delete region;}
 
-const bool readWrite::ioChecker(std::fstream* fs)const {
-   if(!fs)return true;
-   if(fs->eof()) fprintf(stderr, "EOF bit set\n");
-   else if(fs->bad()) fprintf(stderr, "Bad bit set\n");
-   else if(fs->fail()){
-	fprintf(stderr, "Fail bit set\n");
-	if(!*fs) fprintf(stderr, "Not pointing to a valid file\n");
-   }else return fs->good();
-}
-
-const bool readWrite::seekp(std::fstream* fs, const char& obj_id)const {
-   if(!fs)return true;
-   const std::streampos prev = fs->tellp();
-   fs->seekp(std::ios_base::beg);
-   if(seek(fs, obj_id))return true;
-   fs->seekp(prev);  // failure: trace back to cur pos
-   return false;
-}
-
-const bool readWrite::seekg(std::fstream* fs, const char& obj_id)const {
-   if(!fs)return true;
-   const std::streampos prev = fs->tellg();
-   fs->seekp(std::ios_base::beg);
-   if(seek(fs, obj_id))return true;
-   fs->seekg(prev);  // failure: trace back to cur pos
-   return false;
-}
-
-const bool readWrite::seek(std::fstream* fs, const char& obj_id)const {
-   while(!fs->eof()) {
-	fs->ignore(std::numeric_limits<int>::max(), obj_delim);
-	if(!fs->eof()) {
-	   char c;
-	   fs->get(c);	   // search for next char
-	   if(c == obj_id) {
-		fs->unget();   // put position before obj_delim
-		if(!fs->eof())fs->unget();
-		return true;
-	   }
-	}
-   }
-}
-
-template<typename T>
-void readWrite::writeArray(std::fstream* fs, const typename T::iterator& beg,
-	const typename T::iterator& end) {
-   if(!fs || !ioChecker(fs))return;
-   for(typename T::iterator iter=beg; iter!=end; ++iter)
-	(*fs)<<static_cast<float>(*iter)<<' ';
-}
-
-template<typename T1, typename T2>
-void readWrite::readArray(std::fstream* fs, T1& container, const typename
-	T1::iterator& beg, const typename T1::iterator& end)throw(ErrMsg) {
-   if(!fs || !ioChecker(fs))return;
-   double val;
-   for(typename T1::iterator iter=beg; iter!=end; ++iter) {
-	(*fs)>>val; (*iter) = static_cast<T2>(val);
-   }
-   char c;	fs->get(c);	   // should be trailing ws
-   if(c!=0x20) {
-	fs->unget(); throw ErrMsg("readWrite::readArray: trailing space not found!\n");
-   }
-}
-
 // ++++++++++++++++++++++++++++++++++++++++
-// bufferedArray	(objID=0x7)
-
-const char *bufferedArray::exWscope="bufferedArray::write():",
-	*bufferedArray::exRscope="bufferedArray::read():";
-
-bufferedArray::bufferedArray(const float* arr, const unsigned& arr_sz, cv::Mat*
-	pcanvas, const float& rat, const cv::Scalar& lc):readWrite::readWrite(pcanvas,
-	   static_cast<char>(0x7),lc,true),drawFront(arr_sz),
-	canvas_width(region->cols),canvas_height(region->rows),disp_ratio(rat)
-{init(arr);}
-
-bufferedArray::bufferedArray(const float* arr, const unsigned& arr_sz, IplImage*
-	pcanvas, const float& rat, const cv::Scalar& lc):readWrite::readWrite(pcanvas,
-	   static_cast<char>(0x7), lc),disp_ratio(rat),canvas_width(region->cols),
-	canvas_height(region->rows), drawFront(arr_sz){init(arr);}
-
-void bufferedArray::init(const float* arr) {
-   if(drawFront>=canvas_width)
-	for(unsigned index=0; index<drawFront; ++index){
-	   // populate data
-	   data_array.push_back(arr[index]);
-	   float y = arr[index]*disp_ratio;
-	   // NOTE: vertical reversed
-	   pt_array.push_back(cv::Point(static_cast<int>(round(index*canvas_width/
-				drawFront)), static_cast<int>(y>canvas_height-1?0:
-				canvas_height-1-round(y))));
-	}
-   else for(unsigned index=0; index<drawFront; ++index) {
-	   data_array.push_back(arr[index]);
-	   float y = arr[index]*disp_ratio;
-	   pt_array.push_back(cv::Point(index, static_cast<int>
-			(y>canvas_height-1?0:canvas_height-1-round(y))));
-	}
-   for(unsigned index=1; index<drawFront; ++index)	// draw lines
-	dashLine(*region, pt_array.at(index-1), pt_array.at(index));
-   // use default lineType
-}
-
-inline const unsigned& bufferedArray::getSize()const{return drawFront;}
-
-inline const std::deque<float>& bufferedArray::getArray()const{return data_array;}
-
-void bufferedArray::dump()const {
-   puts("==========bufferedArray Data:==========");
-   for(unsigned index=0; index<drawFront; ++index)
-	printf("[%d]: dat=%f, pt=[%d, %d]\n", index+1, data_array.at(index),
-	     	pt_array.at(index).y, pt_array.at(index).y);
-   puts("\n\n====================");
-}
-
-void bufferedArray::addElem(const float& elem) {
-   data_array.push_back(elem);
-   ++drawFront;
-   float x = drawFront>=canvas_width ? drawFront*canvas_width/drawFront:drawFront,
-	y = elem*disp_ratio;
-   pt_array.push_back(cv::Point(static_cast<int>(round(x)), static_cast<int>
-		(y>canvas_height-1?0:canvas_height-1-round(y))));
-   if(drawFront<canvas_width) cv::line(*region, pt_array.at(drawFront-2),
-	   pt_array.at(drawFront-1), lineColor);
-}
-
-void bufferedArray::append(const float* arr, const unsigned& sz) {
-   for(unsigned index=0; index<sz; ++index) addElem(arr[index]);
-}
-
-void bufferedArray::update() {
-   for(cv::MatIterator_<unsigned char> iter=region->begin<unsigned char>();
-	   iter!=region->end<unsigned char>(); ++iter) *iter=0;	// clear
-   if(drawFront<canvas_width)
-	for(unsigned index=0; index<drawFront; ++index){   // re-calc points
-	   float y = data_array[index]*disp_ratio;
-	   pt_array[index] = cv::Point(index, static_cast<int>
-		   (y>canvas_height-1?0:canvas_height-1-round(y)));
-	}
-   else for(unsigned index=0; index<drawFront; ++index) {
-	   float y = data_array[index]*disp_ratio;
-	   pt_array[index] = cv::Point(
-		   static_cast<int>(round(index*canvas_width/drawFront)),
-		   static_cast<int>(y>canvas_height-1? 0 : canvas_height-1-round(y)));
-	}
-   for(unsigned index=1; index<drawFront; ++index)
-	cv::line(*region, pt_array.at(index-1), pt_array.at(index), lineColor);
-}
-
-void bufferedArray::write(std::fstream* fs) {
-   try {
-	fs->put(obj_delim);	// this comes first
-	fs->put(objID);
-	(*fs)<<static_cast<int>(drawFront);	fs->put(field_delim);
-	writeArray<std::deque<float> >(fs, data_array.begin(), data_array.end());
-	fs->put(field_delim);
-
-	// place-holder 4 curve connecting pts
-	std::vector<int>ptx(static_cast<int>(drawFront)),
-	   pty(static_cast<int>(drawFront));
-	for(int index=0; index<drawFront; ++index) {
-	   ptx[index] = pt_array[index].x; pty[index] = pt_array[index].y;
-	}
-	writeArray<std::vector<int> >(fs, ptx.begin(), ptx.end());
-	fs->put(field_delim);
-	writeArray<std::vector<int> >(fs, pty.begin(), pty.end());
-   }
-   catch(const std::ios::failure& ex) {
-	fprintf(stderr, "%s%s\n\t%s\n\n->", err_msg_io, exRscope, ex.what());
-	ioChecker(fs);
-	fs->clear();
-   }
-}
-
-void bufferedArray::read(std::fstream* fs){ // clears and loads data
-   try {
-	char c;
-	fs->get(c);
-	if(c!=obj_delim) {
-	   sprintf(msg, "Object delimiter not found in the begining: %d!=%d",
-		   static_cast<int>(c), static_cast<int>(obj_delim));
-	   fs->unget();
-	   throw ErrMsg(msg);
-	}
-	fs->get(c);
-	if(c!=objID) {
-	   sprintf(msg, "Obj Identifier incorrect: %d!=%d",
-		   static_cast<int>(c), static_cast<int>(objID));
-	   fs->unget();
-	   throw ErrMsg(msg);
-	}
-	int _drawFront;
-	(*fs)>>_drawFront;   fs->get(c);
-	if(c!=field_delim) {
-	   sprintf(msg, "Field delimiter after count %d not found: %d!=%d",
-		   _drawFront, static_cast<int>(c),
-		   static_cast<int>(field_delim));
-	   fs->unget();
-	   throw ErrMsg(msg);
-	}
-	std::deque<float> data_deq(_drawFront);
-	readArray<std::deque<float> >(fs, data_deq, data_deq.begin(),
-		data_deq.end());
-	fs->get(c);
-	if(c!=field_delim) {
-	   sprintf(msg, "Field delimiter not found after data_array: %d!=%d",
-		   static_cast<int>(c), static_cast<int>(field_delim));
-	   fs->unget();
-	   throw ErrMsg(msg);
-	}
-	std::vector<int> ptx(_drawFront);
-	readArray<std::vector<int>, int>(fs, ptx, ptx.begin(), ptx.end());
-	fs->get(c);
-	if(c!=field_delim) {
-	   sprintf(msg,"Field delimiter not found after Pt_x: %d!=%d",
-		   static_cast<int>(c), static_cast<int>(field_delim));
-	   fs->unget();
-	   throw ErrMsg(msg);
-	}
-	std::vector<int> pty(_drawFront);
-	readArray<std::vector<int>, int>(fs, pty, pty.begin(),
-		pty.end());
-	std::deque<cv::Point> point_deq(_drawFront);
-	for(int index=0; index<_drawFront; ++index) {
-	   point_deq[index].x = ptx[index];
-	   point_deq[index].y = pty[index];
-	}
-	data_array.swap(data_deq);
-	pt_array.swap(point_deq);
-   } catch(const std::ios::failure& ex) {
-	fprintf(stderr, "%s%s\n\t%s\n\n->", err_msg_io, exRscope, ex.what());
-	ioChecker(fs); fs->clear();
-   }
-}
-
-// ++++++++++++++++++++++++++++++++++++++++
-// myROI   (objID=0x8)
-// TODO: pass getPolyMat to line 436"dynan.cc",
-// frameRegister::calcDiff?? self-alloc??
-
-const char *myROI::exWscope="myROI::write():", *myROI::exRscope="myROI::read():";
-
+// myROI
 // NOTE: 1st arg(pmat) points to an empty canvass; src/src2
 // points to actual frames
 myROI::myROI(cv::Mat* pmat, cv::Mat* src[2], const bool& enable_redraw):
-   readWrite::readWrite(pmat,static_cast<char>(8), static_cast<cv::Scalar>(0), true),
-	redrawable(enable_redraw),pPoly_updated(true),pt_array(0),psrc(src[0]),
-	psrc2(src[1]),imgSz(cvGetSize(src[1])),flash(off),self_alloc(false),
+   readWrite::readWrite(pmat,true),redrawable(enable_redraw),pPoly_updated(true),pt_array(0),psrc(src[0]),
+	psrc2(src[1]),imgSz(cvGetSize(src[1])),flash(off),self_alloc(false),ready(false),
 	gray(src[0]->channels()==1),wn1(0),wn2(0) {}
 
 myROI::myROI(IplImage* pmat, IplImage* src[2], const char* const wns[2], const bool&
-	enable_redraw):readWrite::readWrite(pmat,static_cast<char>(0x8),
-	   static_cast<cv::Scalar>(0),true),redrawable(enable_redraw),
-	pPoly_updated(true),pt_array(0),flash(off),self_alloc(true),
+	enable_redraw):readWrite::readWrite(pmat,true),redrawable(enable_redraw),
+	pPoly_updated(true),pt_array(0),flash(off),self_alloc(true),ready(false),
 	gray(src[0]->nChannels==1),imgSz(cv::Size(src[0]->width,src[0]->height)) {
    psrc = new cv::Mat(src[0]); psrc2 =new cv::Mat(src[1]);
    wn1 = new char[strlen(wns[0])+1]; wn2 = new char[strlen(wns[1])+1];
@@ -368,8 +141,8 @@ myROI::~myROI() {
 
 void myROI::update() {
    if(flash!=off) {
-	if(flash==state2)cvWaitKey(50);// 50ms flash
-	cv::swap(*psrc, *region);  // for video#1 only
+	if(flash==state2)cvWaitKey(80);// flash
+	cv::swap(*psrc, *region);
 	if(self_alloc) {
 	   cv::imshow(wn1, *psrc); cv::imshow(wn2, *psrc2);
 	}
@@ -387,6 +160,7 @@ void myROI::clear() {
 	if(pt_array) delete[] pt_array;
 	*region = cv::Scalar(0);
    }
+   ready=false;
 }
 
 void myROI::pushLine(const bool tail) {
@@ -399,8 +173,7 @@ void myROI::pushLine(const bool tail) {
 	lines_gray1.push_back(lin1);
 	for(int index=0; index<iter2.count; ++index, ++iter2)lin2[index] = **iter2;
 	lines_gray2.push_back(lin2);
-   }
-   else {
+   }else{
 	std::vector<cv::Vec3b> lin1(iter1.count), lin2(iter2.count);
 	for(int index=0; index<iter1.count; ++index, ++iter1)
 	   lin1[index] = psrc->at<cv::Vec3b>(iter1.pos());
@@ -448,11 +221,15 @@ void myROI::redrawLine()throw(ErrMsg) {
 }
 
 void myROI::pushPoint(const cv::Point& pt){
+   if(pPoly_updated){
+	for(int indx=0; indx<pt_poly.size(); ++indx)popPoint();
+	clear();
+   }
    pt_poly.push_back(pt);
    if(pt_poly.size()>1) {
 	if(redrawable) pushLine(false);
-	dashLine(*psrc, pt_poly.at(pt_poly.size()-2), pt);
-	dashLine(*psrc2, pt_poly.at(pt_poly.size()-2), pt);
+	dashLine(*psrc, pt_poly[pt_poly.size()-2], pt);
+	dashLine(*psrc2, pt_poly[pt_poly.size()-2], pt);
 	// use cv::line using same params to draw solid line
 	if(!gray) {
 	   cv::imshow(wn1, *psrc); cv::imshow(wn2, *psrc2);
@@ -502,84 +279,93 @@ void myROI::getROI() {
 void myROI::dump()const {
    puts("==========ROI Data:==========");
    printf("Ptr array %s.\n", pPoly_updated?"clean":"dirty");
-   for(int index=0; index<pt_poly.size(); ++index)
-	printf("pt $%d = [%d, %d]\n", index+1,pt_poly.at(index).x,pt_poly.at(index).y);
-   puts("====================");
+   For(cv::Point iter, pt_poly)printf("[%d, %d] ", iter.x,iter.y);
+   puts("\n====================");
 }
 
-void myROI::write(std::fstream* fs) {
-   try {
-	fs->put(obj_delim); fs->put(objID);
-	const int sz=pt_poly.size();
-	(*fs)<<sz;	fs->put(field_delim);
-	std::vector<int>ptx(sz), pty(sz);
-	for(int index=0; index<sz; ++index) {
-	   ptx[index]=pt_poly[index].x; pty[index]=pt_poly[index].y;
-	}
-	writeArray<std::vector<int> >(fs, ptx.begin(), ptx.end());
-	fs->put(field_delim);
-	writeArray<std::vector<int> >(fs, pty.begin(), pty.end());
-   } catch(const std::ios::failure& ex) {
-	fprintf(stderr, "%s%s\n\t%s\n\n->", err_msg_io, exRscope, ex.what());
-	ioChecker(fs); fs->clear();
-   } catch(...) {
-	fprintf(stderr, "Unknown error raised in %s file %s "
-		"line %s\n", exWscope, __FILE__, __LINE__);
+void myROI::write(FILE* fs)throw(ErrMsg){
+   if(!ready){
+	fputs("myROI::write: state not ready\n",stderr);
+	fclose(fs); return;
    }
+   fprintf(fs,"%d%s%d%s%d\n", psrc->rows, delim, psrc->cols, delim, pt_poly.size());
+   For(cv::Point iter, pt_poly)
+	fprintf(fs,"[%d%s%d]\n", iter.x, delim, iter.y);
+   fclose(fs);
 }
 
-void myROI::read(std::fstream* fs) {
-   try {
-	char c;
-	fs->get(c);
-	if(c!=obj_delim) {
-	   sprintf(msg, "Obj delimiter not found in the begining: %d!=%d",
-		   static_cast<int>(c), static_cast<int>(obj_delim));
-	   fs->unget(); throw ErrMsg(msg);
-	}
-	fs->get(c);
-	if(c!=objID) {
-	   sprintf(msg, "Obj Identifier incorrect: %d!=%d",
-		   static_cast<int>(c), static_cast<int>(objID));
-	   fs->unget(); throw ErrMsg(msg);
-	}
-	int cnt;
-	(*fs)>>cnt;
-	if(cnt<=0 || cnt>1024) {
-	   sprintf(msg, "vector size illegal: %d", cnt);	   // unget int?
-	   throw ErrMsg(msg);
-	}
-	fs->get(c);
-	if(c!=field_delim) {
-	   sprintf(msg, "Field delimiter not found after vector size %d: %d!=%d",
-		   cnt, static_cast<int>(c), static_cast<int>(field_delim));
-	   fs->unget(); throw ErrMsg(msg);
-	}
-	std::vector<int> ptx(cnt);
-	readArray<std::vector<int>, int>(fs, ptx, ptx.begin(), ptx.end());
-	fs->get(c);
-	if(c!=field_delim) {
-	   sprintf(msg, "Field delimiter not found after ptx: %d!=%d",
-		   cnt, static_cast<int>(c), static_cast<int>(field_delim));
-	   fs->unget(); throw ErrMsg(msg);
-	}
-	std::vector<int> pty(cnt);
-	readArray<std::vector<int>, int>(fs, pty, pty.begin(), pty.end());
-	pt_poly.clear();
-	for(int index=0; index<cnt; ++index)
-	   pt_poly.push_back(cv::Point(ptx[index], pty[index]));
-// 	if(redrawable)		   // redraw lines of *psrc
-// 	   for(int index=0; index<lines.size(); ++index)
-// 		redrawLine();
-// 	lines.clear();	// ???
-// 	*region = cv::Scalar(0);
-// 	pPoly_updated=redrawable=false;
-   } catch(const std::ios::failure& ex) {
-	fprintf(stderr, "%s%s\n\t%s\n\n->", err_msg_io, exRscope,
-		ex.what());
-	ioChecker(fs);
-	fs->clear();
+void myROI::read(FILE* fs)throw(ErrMsg){
+   if(ready) fputs("Warning: myROI::read: state ready to be saved, but "
+	   "loading ROI requested.\nSelected ROI abandoned.\n",
+	   stderr);
+   size_t lineCap=128; char lineC[lineCap+1], *line=lineC;
+   if(getline(&line, &lineCap, fs)==-1){
+	fclose(fs); throw ErrMsg("myROI::read: cannot read 1st line.");
    }
+   char* vals[]={strtok(line,delim), strtok(0,delim), strtok(0,"\n")},
+	*tail1, *tail2, *tail3,**tailptr[3]={&tail1, &tail2, &tail3};
+   long width=strtol(vals[1],tailptr[0],10), height=strtol(vals[0],tailptr[1],10),
+	  nRec=strtol(vals[2],tailptr[2],10);
+   if(!(*tailptr[0]&& *tailptr[1]&& *tailptr[2])){
+	fclose(fs); throw ErrMsg("myROI::read: data corrupted on line #1.\n");
+   }else if(width!=psrc->cols || height!=psrc->rows){
+	sprintf(msg, "myROI::read: dimension disagreement: [%ld %ld]!=[%d %d] "
+		"on line #1.\n", width, height, psrc->cols, psrc->rows);
+	fclose(fs); throw ErrMsg(msg);
+   }
+   std::vector<cv::Point> tmp(nRec);
+   for(int indx=0; indx<nRec; ++indx)
+	if(getline(&line, &lineCap, fs)==-1){
+	   sprintf(msg,"myROI::read: data corrupted on line #%d: EOF\n", indx+2);
+	   fclose(fs); throw ErrMsg(msg);
+	}else{
+	   vals[0]=strtok(line,delim); vals[1]=strtok(0,"\n");
+	   if(*vals[0]!='[' || *(vals[1]+strlen(vals[1])-1)!=']'){
+		sprintf(msg,"myROI::read: data corrupted on line #%d: "
+			"missing bracket.\n", indx+2);
+		fclose(fs); throw ErrMsg(msg);
+	   }
+	   *(vals[1]+strlen(vals[1])-1)=0;
+	   tmp[indx].x = strtol(vals[0]+1,tailptr[0],10);
+	   tmp[indx].y = strtol(vals[1],tailptr[1],10);
+	   if(!(*tailptr[0]&&*tailptr[1])){
+		sprintf(msg,"myROI::read: data corrupted on line #%d: "
+			"invalid number\n", indx+2);
+		fclose(fs); throw ErrMsg(msg);
+	   }
+	}
+   fclose(fs); clear();
+   For(cv::Point iter, tmp)pushPoint(iter);
+   getROI();
+   if(::verbose)dump();
+}
+
+bool myROI::chkConvexPolygon(std::vector<cv::Point> v){
+   if(v.size()<3)return false;   // Jarvis
+   if(v.size()==3)return (v[0].y-v[1].y)*(v[1].x-v[2].x) !=
+	(v[0].x-v[1].x)*(v[1].y-v[2].y);
+   for(int indx=1; indx<v.size(); ++indx)
+	if((v[indx-1].y-v[indx].y)*(v[indx].x-v[(indx+1)%v.size()].x) ==
+		(v[indx-1].x-v[indx].x)*(v[indx].y-v[(indx+1)%v.size()].y))
+	   v.erase(v.begin()+indx);
+   bool max = deg(v[0],v[1],v[2])>deg(v[0],v[1],v[3]);
+   for(int indx=1; indx<v.size(); ++indx){
+	double m=deg(v[indx-1],v[indx],v[indx+1]), cur;
+	for(int indx2=indx+2; indx2<v.size(); ++indx2)
+	   if(max && (cur=deg(v[indx-1],v[indx],v[indx2]))>m ||
+		   !max && cur<m) return false;
+   }
+   return true;
+}
+
+inline double myROI::deg(const cv::Point& prev, const cv::Point& from,
+	const cv::Point& to){
+   double a1 = atan2(to.y-from.y,to.x-from.x),
+   a0 = atan2(from.y-prev.y,from.x-prev.x),
+   dd=(a0<0?2*M_PI-a0:a0) - (a1<0?2*M_PI-a1:a1);
+   while(dd<0)dd+=2*M_PI;
+   while(dd>=2*M_PI)dd-=2*M_PI;
+   return dd;
 }
 
 //++++++++++++++++++++++++++++++++++++++++
@@ -691,8 +477,6 @@ void Filter1D::dump()const{
 //++++++++++++++++++++++++++++++++++++++++
 // VideoDFT	   (objID=0x9)
 
-const char* VideoDFT::exWscope="VideoDFT::write():",
-	*VideoDFT::exRscope="VideoDFT::read():";
 VideoDFT::DftPartition VideoDFT::DftPartitionMethod=Ring;
 
 VideoDFT::VideoDFT(IplImage* _frame, const Transform& tr, const int& bins,

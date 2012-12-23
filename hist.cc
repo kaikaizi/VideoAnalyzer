@@ -101,7 +101,7 @@ void MouseCallback(int event, int x, int y, int flags, void* param){
    switch(event){
 	case CV_EVENT_LBUTTONDOWN:
 	   if(VideoCtrlStream::roi && VideoCtrlStream::roiState){
-		int tmp[3] = {1,x,y};
+		int tmp[] = {1,x,y};
 		roiMouseCallBack(tmp, *(VideoCtrlStream::roi));
 	   }
 	   break;
@@ -110,9 +110,9 @@ void MouseCallback(int event, int x, int y, int flags, void* param){
 		if(VideoCtrlStream::roiState && !(flags & CV_EVENT_FLAG_CTRLKEY)){
 		   roiMouseCallBack(&(i_n=2), *(VideoCtrlStream::roi));
 		} else if(flags & CV_EVENT_FLAG_CTRLKEY){	// toggles myROI mode
-		   fprintf(stderr, "%s ROI selection mode\n",
+		   fprintf(stderr, "%s ROI selection mode: ",
 			   VideoCtrlStream::roiState?"Out of":"In");
-		   if((VideoCtrlStream::roiState=!VideoCtrlStream::roiState)==false){
+		   if(false==(VideoCtrlStream::roiState=!VideoCtrlStream::roiState)){   // TODO
 			// quit selection
 			roiMouseCallBack(&(i_n=0), *(VideoCtrlStream::roi));
 			// pass ROI to histogram

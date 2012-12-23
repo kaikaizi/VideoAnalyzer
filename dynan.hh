@@ -354,14 +354,6 @@ public:
 * subtracted.
 */
    const long tm()const;
-/**
-* @name Not in use
-* @{ */
-// call this before read/write
-   void setFileName(const char*);
-   void setFileName(const std::string&);
-   void read();
-   void write();
 /**  @} */
 /**
 * @brief Prints information of DFT, ROI, bufferedArray and
@@ -371,8 +363,6 @@ public:
 protected:
    static double	tickFreq;
    static bool firstCall;
-   static std::string	fn;
-   static std::fstream* pfs;
    long curTick, prevTick;
    const short frameNum;
    const bool  vp_null, vd_null,showBar, showDft;
