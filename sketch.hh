@@ -64,7 +64,7 @@ public:
 */
    readWrite(cv::Mat* mat, const bool& alloc=false)throw(ErrMsg);
    readWrite(IplImage* ipl, const bool& alloc=false)throw(ErrMsg);
-   ~readWrite();
+   ~readWrite(){if(self_alloc)delete region;}
 /**  @} */
 /**
 * @name 
@@ -219,7 +219,9 @@ public:
 * Recalculates 2D-DFT and energy distribution
 */
    void update();
-   void update(IplImage*);
+   void update(IplImage* frm){
+	frame = frm; update();
+   }
 /**  @} */
    const std::vector<double>& getEnergyDist()const{return energyDist;}
 /**
@@ -322,7 +324,9 @@ public:
 */
    void resize(const cv::Size& sz)throw(ErrMsg);
    void labelAxes(const std::vector<float>&, const std::vector<float>&);
-   void labelAxesAuto();
+   void labelAxesAuto(){
+	labelAxes(findAxis(x_start, x_end), findAxis(y_start, y_end));
+   }
    void redraw();
    void dump();
    const cv::Mat& get()const{return canvass;}

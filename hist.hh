@@ -39,7 +39,7 @@ typedef enum{Default=-1, Correlation=CV_COMP_CORREL, Chi_square=CV_COMP_CHISQR,
  * @param brightness brightness (0-255) to be set. Defaults
  * to 0.
  */
-void setIplImage(IplImage*, const char& brightness=0);
+void setIplImage(IplImage*, const char& =0);
 
 /**
 * @relates Hist
@@ -107,7 +107,8 @@ public:
    explicit Hist(const frameSizeEq* fse, const unsigned& nbins=30, const bool&
 	   drawable =true, const unsigned& gap=3, const cv::Mat* _mask=0,
 	   const cv::Size& scale_sz=cv::Size(3,140));
-   ~Hist();
+   ~Hist(){delete mask;}
+
 /**  @} */
 
 /**
@@ -115,15 +116,21 @@ public:
  * @brief notify that frame pts are updated; histogram
  * need recalculation. May re-install frame pts.
  * @{ */
-   void update();
-   void update(IplImage*, IplImage*);
+   void update(){
+	if(src1) calc(true);
+	if(src2) calc(false);
+	draw();
+   }
+   void update(IplImage* frm1, IplImage* frm2){src1=frm1; src2=frm2; update();}
 /**  @} */
 
 /**
  * @brief Get histogram vector
  * @param first first frame?
  */
-   const std::vector<float>& get(const bool& first)const;
+   const std::vector<float>& get(const bool& first)const{
+	return first?bin1:bin2;
+   }
 
 /**
  * @brief Updates mask used. Performs a deep copy
@@ -186,7 +193,10 @@ public:
  * @param p1 i.i.d probability of each frame
  * @param p2 successive dropping probability
  */
-   void dropProb(const float& p1, const float& p2);
+   void dropProb(const float& p1, const float& p2){
+	drop_prob = p1<0||p1>=1? drop_prob : p1;
+	cond_prob = p2<0||p2>=1? cond_prob : p2;
+   }
 /**
  * @brief returns the drop array; re-initialize if desired
 */
@@ -245,7 +255,7 @@ public:
    void update(const int& d1, const int& d2){  // advance 1 frame
 	if(++histIndex>history.size())history.push_back(std::make_pair(d1,d2));
    }
-   static void setROI(myROI* mr);
+   static void setROI(myROI* mr){roi=mr;}
 protected:
    static bool pause, Esc, trackState, stop, rewind;
    static int w1, w2;	// track pixel brightness with right mouse down;
@@ -279,7 +289,8 @@ public:
 * @{ */
    frameBuffer(const size_t& sz, IplImage* pfrms[2]);
    frameBuffer(const size_t& sz, frameSizeEq* fse);
-   ~frameBuffer();
+   ~frameBuffer(){if(mask)cvReleaseImage(&mask);}
+
 /**  @} */
 /**
 * @name update

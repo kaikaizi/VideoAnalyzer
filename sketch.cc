@@ -52,6 +52,7 @@ void roiMouseCallBack(const int* params, myROI& roi) {
    if(*params==1) {
 	roi.pushPoint(cv::Point(*(params+1), *(params+2)));
 	fprintf(stderr,"[%d, %d] added.\n", *(params+1), *(params+2));
+	fflush(stderr);
    }else if(*params==2) {
 	const cv::Point &last=roi.popPoint();
 	if(last.x>=0)fprintf(stderr, "[%d %d] removed.\n",
@@ -59,7 +60,7 @@ void roiMouseCallBack(const int* params, myROI& roi) {
    }else if(*params==3) {
 	if(roi.pt_poly.size()<2){  // also check for other conds?
 	   fputs("Warning: roiMouseCB::invalid polygon\n", stderr);
-	   return;
+	   fflush(stderr); return;
 	}
 	if(!myROI::chkConvexPolygon(roi.pt_poly))
 	   fputs("\nWarning: roiMouseCB:: concave polygon\n", stderr);
@@ -69,7 +70,7 @@ void roiMouseCallBack(const int* params, myROI& roi) {
 	fputs("File name to save image mask: ", stderr);
 	char fname[64]; int len;
 	if(!fgets(fname, 32, stdin) || 1==(len=strlen(fname))){
-	   fputs("\nfgets failed or no input.\n Mask not saved.",stderr);
+	   fputs("\nMask NOT saved.",stderr); fflush(stderr);
 	   roi.clear(); return;	// making mask-selection an no-op
 	}
 	fname[strlen(fname)-1]=0;
@@ -77,7 +78,7 @@ void roiMouseCallBack(const int* params, myROI& roi) {
 	FILE* fp;
 	if((fp=fopen(fname,"r"))){
 	   fprintf(stderr,"Warning: %s already exists.\n", fname);
-	   fclose(fp);
+	   fflush(stderr); fclose(fp);
 	}
 	if(!(fp=fopen(fname, "w"))){
 	   sprintf(msg, "roiMouseCallBack: cannot write to file %s\n", fname);
@@ -87,12 +88,12 @@ void roiMouseCallBack(const int* params, myROI& roi) {
    }else roi.getROI();
 }
 
-ErrMsg::ErrMsg(const char* _msg, const int& id):Errno(id){
+inline ErrMsg::ErrMsg(const char* _msg, const int& id):Errno(id){
    memset(msg,0,256); strcpy(msg, _msg);
    sprintf(msg+strlen(_msg), ":0x%x",id);
 }
 
-ErrMsg::ErrMsg(const std::string& _msg, const int& id):Errno(id){
+inline ErrMsg::ErrMsg(const std::string& _msg, const int& id):Errno(id){
    memset(msg,0,256); strcpy(msg, _msg.c_str());
    sprintf(msg+_msg.size(), ":0x%x",id);
 }
@@ -105,13 +106,12 @@ readWrite::readWrite(cv::Mat* mat, const bool& alloc)throw(ErrMsg):
    if(!region)throw ErrMsg("readWrite::ctor: Mat data cannot be NULL.\n");
 }
 
-readWrite::readWrite(IplImage* ipl, const bool& alloc)throw(ErrMsg):self_alloc(alloc){
+readWrite::readWrite(IplImage* ipl, const bool& alloc)throw(ErrMsg)
+   :self_alloc(alloc){
    if(self_alloc) region = new cv::Mat(ipl);
    else region = new cv::Mat(ipl);	// TODO: ???
    if(!region) throw ErrMsg("readWrite::ctor: Mat data cannot be NULL.\n");
 }
-
-readWrite::~readWrite(){if(self_alloc)delete region;}
 
 // ++++++++++++++++++++++++++++++++++++++++
 // myROI
@@ -371,7 +371,7 @@ inline double myROI::deg(const cv::Point& prev, const cv::Point& from,
 //++++++++++++++++++++++++++++++++++++++++
 // Filter1D
 
-const float Filter1D::sinc(const float& val){
+inline const float Filter1D::sinc(const float& val){
    return val==0 ? 1:sin(val)/val;
 }
 
@@ -546,10 +546,6 @@ void VideoDFT::init() {
 	}
    }
    update();
-}
-
-void VideoDFT::update(IplImage* frm) {
-   frame = frm; update();
 }
 
 void VideoDFT::update() {
@@ -822,7 +818,7 @@ const int Plot2D::set(const std::vector<float>& x, const std::vector<float>& y,
    return max_id-1;
 }
 
-void Plot2D::reset(const int& id){
+inline void Plot2D::reset(const int& id){
    LinesIter iter;
    if((iter=lines.find(id)) == lines.end())return;
    lines.erase(iter); redraw();
@@ -989,10 +985,6 @@ std::vector<float> Plot2D::findAxis(const float& min, const float& max){
    for(float f=ceilf(min/scale)*scale; f<=floorf(max/scale)*scale; f+=scale)
 	ax.push_back(f);
    return ax;
-}
-
-void Plot2D::labelAxesAuto(){
-   labelAxes(findAxis(x_start, x_end), findAxis(y_start, y_end));
 }
 
 //++++++++++++++++++++++++++++++++++++++++
@@ -1376,7 +1368,8 @@ void createAnimation::warp(){
 void createAnimation::factory()throw(ErrMsg){
    if(FILE* fp=fopen(name, "r")){
 	fprintf(stderr, "createAnimation::factory:\"%s\" exists. Overwritten.\n",
-		name); fclose(fp);
+		name); fflush(stderr); fclose(fp);
+
    }
    CvVideoWriter* write;
    try{

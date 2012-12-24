@@ -22,6 +22,10 @@
 #define For BOOST_FOREACH
 
 extern char msg[256];
+
+void swap(VideoProp&fst, VideoProp&snd){
+   VideoProp tmp(fst); fst=snd; snd=tmp;
+}
 //++++++++++++++++++++++++++++++++++++++++
 dynan::dynan(const IplImage** ppsrc, IplImage** ppdest, const unsigned& srcNum,
 	const unsigned& destNum, const unsigned& insertLoc, const InterpMetric& ic,
@@ -287,10 +291,6 @@ void VideoProp::update(const bool& lazy)throw(ErrMsg){
    prop.codec=static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FOURCC));
 }
 
-void swap(VideoProp& fst, VideoProp& snd){
-   VideoProp tmp(fst); fst=snd; snd=tmp;
-}
-
 // ++++++++++++++++++++++++++++++++++++++++
 // frameSizeEq
 
@@ -322,11 +322,6 @@ void frameSizeEq::cvt2Gray(IplImage* img){
    if(cvtGrayFast) for(int indx=0; indx<sz; ++indx, c+=3)memset(c+1,*c,2);
    else for(int indx=0; indx<sz; ++indx, c+=3)memset(c, static_cast<unsigned char>
 		(*c*.0722+*(c+1)*.7152+*(c+2)*.2126), 3);
-}
-
-frameSizeEq::~frameSizeEq() {
-   if(img1Created)cvReleaseImage(&oframe1);
-   if(img2Created)cvReleaseImage(&oframe2);
 }
 
 void frameSizeEq::update(const bool& first) {
@@ -392,8 +387,6 @@ frameRegister::~frameRegister() {
    delete[] diffPos, delete[] diffVal;
    cvReleaseCapture(&src_cap), cvReleaseCapture(&dest_cap);
 }
-
-void frameRegister::setROI(myROI* roi_set){roi = roi_set;}
 
 const int frameRegister::reg(const int& pos, const int& prev_reg, const DiffMethod&
 	me)throw(ErrMsg){
@@ -586,21 +579,6 @@ void Logger::update(){
    vdft_diff1.push_back(ff[7]); vdft_diff3.push_back(ff[8]); vdft_diff4.push_back(ff[9]);
 }
 
-const std::vector<float>& Logger::get(const int& id)const{
-   switch(id){
-	case 0: return vdyn1;
-	case 1: return vdyn2;
-	case 2: return vdiff;
-	case 3: return vhist_diff1;
-	case 4: return vhist_diff2;
-	case 5: return vhist_diff3;
-	case 6: return vhist_diff4;
-	case 7: return vdft_diff1;
-	case 8: return vdft_diff3;	// skipping DT Chi-square
-	default: return vdft_diff4;
-   }
-}
-
 //++++++++++++++++++++++++++++++++++++++++
 
 double Updater::tickFreq = cv::getTickFrequency();
@@ -621,8 +599,9 @@ Updater::Updater(const short& cnt, VideoProp** _vp, VideoDFT** _vd, myROI* _roi,
    }
 }
 
-Updater::~Updater() {
-   if(dftBar)delete dftBar;
+void Updater::dump()const{
+   if(!vd_null)For(VideoDFT* i, vd_vec)i->dump();
+   if(roi)roi->dump();	if(hist)hist->dump();
 }
 
 void Updater::update(const bool& locked, const bool& log) {
@@ -646,15 +625,6 @@ void Updater::update(const bool& locked, const bool& log) {
    if(verbose)dump();
 }
 
-void Updater::dump()const {
-   if(!vd_null)For(VideoDFT* i, vd_vec)i->dump();
-   if(roi)roi->dump();	if(hist)hist->dump();
-}
-
-const long Updater::tm()const{	// in unit of ms
-   return static_cast<long>(1000*(curTick-prevTick)/tickFreq);
-}
-
 //++++++++++++++++++++++++++++++++++++++++
 
 char VideoRegister::Codec[]="DIV3";
@@ -667,8 +637,6 @@ VideoRegister::VideoRegister(VideoProp& vp, char*const fname, const char& bright
 	sprintf(msg,"VideoRegister::ctor: file name NULL.\n"); throw ErrMsg(msg);
    }
 }
-
-VideoRegister::~VideoRegister(){delete[] appName;}
 
 void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
 	const float* noiseLevel, const simDropFrame* df, const int& dropMethod)

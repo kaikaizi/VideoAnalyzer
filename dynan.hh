@@ -91,6 +91,7 @@ public:
 */
    void update(const bool& lazy=true)throw(ErrMsg);
 };
+
 void swap(VideoProp&, VideoProp&);
 /**
 * @brief Frame size equalizer. Manages a pair of images of
@@ -104,7 +105,10 @@ public:
 * when resizing not needed.
 * @{ */
    explicit frameSizeEq(IplImage* pfrm[2]);
-   ~frameSizeEq();
+   ~frameSizeEq(){
+	if(img1Created)cvReleaseImage(&oframe1);
+	if(img2Created)cvReleaseImage(&oframe2);
+   }
 /**  @} */
 /**
 * @name update
@@ -190,7 +194,7 @@ public:
 * @brief Installs ROI based on which to perform frame-wise match
 * @param myROI  ROI object
 */
-   static void setROI(myROI*);
+   static void setROI(myROI* _roi){roi=_roi;}
    static void setHsb(const float& f){
 	if(f>0 && f<1)heuristicSearchBound=f;
    }
@@ -279,7 +283,20 @@ public:
     * histogram difference (ID=3-6), DFT difference (ID=7-9, no Chi-square).
     * @return retrieved vector stored so far
     */
-   const std::vector<float>& get(const int& id)const;
+   const std::vector<float>& get(const int& id)const{
+	switch(id){
+	   case 0: return vdyn1;
+	   case 1: return vdyn2;
+	   case 2: return vdiff;
+	   case 3: return vhist_diff1;
+	   case 4: return vhist_diff2;
+	   case 5: return vhist_diff3;
+	   case 6: return vhist_diff4;
+	   case 7: return vdft_diff1;
+	   case 8: return vdft_diff3;	// skipping DT Chi-square
+	   default: return vdft_diff4;
+	}
+   }
 protected:
    bool normVec[2];
    struct File{
@@ -336,7 +353,7 @@ public:
    Updater(const short& cnt, VideoProp** _vp, VideoDFT** _vd, myROI* _roi, Hist*
 	   _hist, frameUpdater* _fu, Logger& _log, const bool& _showBar=false,
 	   const bool& _showDft=false);
-   ~Updater();
+   ~Updater(){if(dftBar)delete dftBar;}
 /**  @} */
 /**
 * @brief updates video property, DFT, histogram,
@@ -353,7 +370,9 @@ public:
 * frame. In case of paused video, the time of pause is *NOT*
 * subtracted.
 */
-   const long tm()const;
+   const long tm()const{
+	return static_cast<long>(1000*(curTick-prevTick)/tickFreq);
+   }
 /**  @} */
 /**
 * @brief Prints information of DFT, ROI, bufferedArray and
@@ -395,7 +414,7 @@ public:
 * @throw ErrMsg fname string NULL
 */
    VideoRegister(VideoProp& vp, char*const fname, const char& bright=0xff)throw(ErrMsg);
-   ~VideoRegister();
+   ~VideoRegister(){delete[] appName;}
 /**
 * @name prepender/reg-saver
 * @brief prepends/reg-saves given VideoProp to a new file.

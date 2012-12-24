@@ -18,7 +18,7 @@
 #include "dynan.hh"
 #include "conf.hh"
 
-void setIplImage(IplImage* im, const char& brightness) {
+void setIplImage(IplImage*im, const char& brightness){
    if(im)memset(im->imageData, brightness, im->imageSize*sizeof(char));
 }
 
@@ -160,16 +160,6 @@ void Hist::init(const cv::Mat* _mask) {
    bin1.assign(nbins,0), bin2.assign(nbins,0);
 }
 
-Hist::~Hist(){delete mask;}
-
-void Hist::update() {
-   if(src1) calc(true);
-   if(src2) calc(false);
-   draw();
-}
-
-void Hist::update(IplImage* frm1, IplImage* frm2){src1=frm1; src2=frm2; update();}
-
 void Hist::setMask(const cv::Mat* mat) {
    if(mat) {
 	delete mask; mask = new cv::Mat(*mat);
@@ -189,8 +179,6 @@ void Hist::calc(const bool first) {
    if(first)for(int h=0; h<nbins; ++h) bin1[h]=hist1.at<float>(h);
    else	for(int h=0; h<nbins; ++h) bin2[h]=hist2.at<float>(h);
 }
-
-const std::vector<float>& Hist::get(const bool& first)const{return first?bin1:bin2;}
 
 void Hist::dump()const
 {
@@ -256,11 +244,6 @@ void simDropFrame::shuffle(){
 	   static_cast<float>(rand())/RAND_MAX < drop_prob;
 }
 
-void simDropFrame::dropProb(const float& p1, const float& p2) {
-   drop_prob = p1<0||p1>=1? drop_prob : p1;
-   cond_prob = p2<0||p2>=1? cond_prob : p2;
-}
-
 void simDropFrame::dump()const {
    if(drop_array) {
 	printf("----------DropFrame (%d)----------\n", size);
@@ -299,9 +282,7 @@ VideoCtrlStream::VideoCtrlStream(IplImage* images[2], const char* wns[2],
    }
 }
 
-VideoCtrlStream::~VideoCtrlStream(){
-   delete fs1; delete fs2;
-}
+VideoCtrlStream::~VideoCtrlStream(){delete fs1; delete fs2;}
 
 void VideoCtrlStream::setPause() {
    if(!stop && !(curFrameDelay=(pause=!pause)?0:frameDelay)){
@@ -311,8 +292,6 @@ void VideoCtrlStream::setPause() {
 		vp2->prop.posFrame=history[histIndex].second);
    }
 }
-
-void VideoCtrlStream::setROI(myROI* mr){roi=mr;}
 
 void VideoCtrlStream::kbdEventHandle(const keyboard& kbd) {
    img1=img10, img2=img20;	// in case fs substitutes img1/img2
@@ -379,7 +358,7 @@ void VideoCtrlStream::kbdEventHandle(const keyboard& kbd) {
    if(kbd!=PrevFrame)rewind=false;
 }
 
-void VideoCtrlStream::waterMark(cv::Mat& img, const char* title, const
+inline void VideoCtrlStream::waterMark(cv::Mat& img, const char* title, const
 	cv::Point& start){
    cv::Mat text(img.rows, img.cols, img.type(), cv::Scalar(0));
    cv::putText(text, title, start, 2, 1, cv::Scalar(30, 60, 30), 2);
@@ -412,10 +391,6 @@ void frameBuffer::init() {
 	memcpy(copy->imageData, image2->imageData, image2->imageSize);
 	obuffer2.push_back(copy);
    }
-}
-
-frameBuffer::~frameBuffer() {
-   if(mask)cvReleaseImage(&mask);
 }
 
 void frameBuffer::setMask(const IplImage* _mask) {
