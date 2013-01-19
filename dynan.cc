@@ -15,6 +15,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 #include "dynan.hh"
+#include "encoder.hh"
 #include <fstream>
 #include <ctime>
 #include <iostream>
@@ -246,15 +247,15 @@ int dynan::typeCmp(const void* src, const void* dest) {
 //++++++++++++++++++++++++++++++++++++++++
 // VideoProp
 
-VideoProp::Props::Props(const int& width, const int& height, const int& fps, const
-	int& fcount, const int& posFrame, const float& posMsec, const float& posRatio,
-	const int& codec, const int& depth, const int& chan):width(width),
-   height(height),fps(fps),fcount(fcount),posFrame(posFrame),posMsec(posMsec),
-   posRatio(posRatio),codec(codec),depth(depth),chan(chan){}
+VideoProp::Props::Props(const cv::Size& sz, const int& fps, const int& fcount,
+	const int& posFrame, const float& posMsec, const float& posRatio,
+	const int& codec, const int& depth, const int& chan):size(sz),fps(fps),
+   fcount(fcount),posFrame(posFrame),posMsec(posMsec),posRatio(posRatio),
+   codec(codec),depth(depth),chan(chan){}
 
 VideoProp::VideoProp(CvCapture* cap):cap(cap),ip(cvQueryFrame(cap)),
-   prop(static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FRAME_WIDTH)),
-	   static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FRAME_HEIGHT)),
+   prop(cv::Size(static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FRAME_WIDTH)),
+	   static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FRAME_HEIGHT))),
 	   static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FPS)),
 	   static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FRAME_COUNT)),
 	   static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_POS_FRAMES)),
@@ -282,8 +283,9 @@ void VideoProp::update(const bool& lazy)throw(ErrMsg){
    prop.depth=ip->depth; prop.chan=ip->nChannels;
    prop.posFrame=static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_POS_FRAMES));
    cvSetCaptureProperty(cap, CV_CAP_PROP_POS_FRAMES, --prop.posFrame);
-   prop.width=static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FRAME_WIDTH));
-   prop.height=static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FRAME_HEIGHT));
+   prop.size=cv::Size(static_cast<int>(cvGetCaptureProperty(cap,
+		   CV_CAP_PROP_FRAME_WIDTH)), static_cast<int>(cvGetCaptureProperty(cap,
+			CV_CAP_PROP_FRAME_HEIGHT)));
    prop.fps=static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FPS));
    prop.fcount=static_cast<int>(cvGetCaptureProperty(cap, CV_CAP_PROP_FRAME_COUNT));
    prop.posMsec=cvGetCaptureProperty(cap, CV_CAP_PROP_POS_MSEC);
@@ -648,19 +650,21 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
    cvSetCaptureProperty(vp.cap,CV_CAP_PROP_POS_FRAMES,0);
    int icodec = cvGetCaptureProperty(vp.cap, CV_CAP_PROP_FOURCC); CvVideoWriter* write;
    try{
-	write = cvCreateVideoWriter(appName, icodec, vp.prop.fps, cvSize(vp.prop.width,
-		   vp.prop.height), vp.prop.chan);
+	write = cvCreateVideoWriter(appName, icodec, vp.prop.fps, vp.prop.size, vp.prop.chan);
    }catch(const cv::Exception& ex){
 	char *p=reinterpret_cast<char*>(&icodec), codec[]={*p, *(p+1), *(p+2), *(p+3), 0};
-	printf("Warning: VideoRegister::save: original codec format \"%s\" not supported."
-		" Fall back to \"%s\" codec option.\n", codec, Codec);
-	write = cvCreateVideoWriter(appName, CV_FOURCC(Codec[0],Codec[1],Codec[2],Codec[3]),
-		vp.prop.fps, cvSize(vp.prop.width, vp.prop.height), vp.prop.chan);
+	printf("Warning: VideoRegister::save: original codec format \"%s\" not supported.", codec);
+	try{
+	   const char* nms[]={fname,appName};
+	   Encoder enc(nms, vp, icodec); return;
+	}catch(const ErrMsg& ex){
+	   printf("runtime error: %s\nFall back to \"%s\" codec option.\n", ex.what(), Codec);
+	   write = cvCreateVideoWriter(appName, CV_FOURCC(Codec[0],Codec[1],Codec[2],Codec[3]),
+		   vp.prop.fps, vp.prop.size, vp.prop.chan);
+	}
    }
-   IplImage* frame=np>0&&noiseType>0? cvCreateImage(cvSize(vp.prop.width,
-		vp.prop.height), vp.prop.depth, vp.prop.chan):0,
-	*framePrev=df>0 ? cvCreateImage(cvSize(vp.prop.width,
-		vp.prop.height), vp.prop.depth, vp.prop.chan):0; 
+   IplImage* frame=np>0&&noiseType>0? cvCreateImage(vp.prop.size, vp.prop.depth, vp.prop.chan):0,
+	*framePrev=df>0 ? cvCreateImage(vp.prop.size, vp.prop.depth, vp.prop.chan):0; 
    bool frameCap=false;
    simDropFrame* drop2 = df && dropMethod==3 ? new simDropFrame(*df):0;
    const bool *dropSeq=df&&dropMethod?df->dropArray():0,
@@ -728,6 +732,7 @@ void VideoRegister::save(char*const suf, const cv::Size& sz)throw(ErrMsg,cv::Exc
 	char *p=reinterpret_cast<char*>(&icodec), codec[]={*p, *(p+1), *(p+2), *(p+3), 0};
 	printf("Warning: VideoRegister::save: original codec format \"%s\" not supported."
 		" Fall back to \"%s\" codec option.\n", codec, Codec);
+	// TODO: try xvid extension: /usr/share/xvid.h
 	write = cvCreateVideoWriter(appName, CV_FOURCC(Codec[0],Codec[1],Codec[2],Codec[3]),
 		vp.prop.fps, cvSize(width2,height2), vp.prop.chan);
    }
@@ -750,7 +755,7 @@ void VideoRegister::save(char*const suf, const cv::Size& sz)throw(ErrMsg,cv::Exc
 }
 
 int VideoRegister::reg(const cv::Size& dimHint)throw(ErrMsg){
-   const int &width=vp.prop.width, &height=vp.prop.height;
+   const int &width=vp.prop.size.width, &height=vp.prop.size.height;
    cvSetCaptureProperty(vp.cap,CV_CAP_PROP_POS_FRAMES,0); 
    int nMatched=0, matches[]={0,0}, indx=0;
    double mean, sd; bool verbose=false;

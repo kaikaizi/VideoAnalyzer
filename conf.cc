@@ -415,6 +415,9 @@ int cv_getopt(int argc, char* argv[], char* optargs[5], int16_t& status){
    if(status&0x100) status&=0xffa6;	// mask-out 'simulate', 'prepend' and 'register'
    if(status&0x4) return status==0x4 ? 1 :
 	   !puts("Error: gen-conf option cannot be combined with other options.");
+   else if((status&0x80) && argv[optind]) return
+	!puts("Error: gen-video mode do not accept additional arguments.\nMixed with"
+		"prepend mode?");
    else if(!(status&0x80) && argc-optind!=1){
 	puts("Error: Missing main argument.\n");
 	help(argv[0]); return 0;
@@ -626,7 +629,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 	}
 	else{
 	   VideoProp vp_sec(cvCreateFileCapture(reference));
-	   vr.save(conf_str[1], cv::Size(vp_sec.prop.width, vp_sec.prop.height));
+	   vr.save(conf_str[1], vp_sec.prop.size);
 	}
 	return;
    }
@@ -687,8 +690,8 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
    // substitution for logging file
    char logfn[strlen(conf_str[2])+strlen(main_arg)+1];
    logfSubs(conf_str[2], main_arg, logfn);
-   Logger* logs=new Logger(logfn, pvp, mas, hist, vds, normDiff);	// Note: not deleting logs avoid segfault,
-											// don't know why.
+//    Logger* logs=new Logger(logfn, pvp, mas, hist, vds, normDiff);	// Note: not deleting logs avoid segfault,
+   Logger *logs=new Logger(logfn, pvp, mas, hist, vds, normDiff);	// Note: not deleting logs avoid segfault, don't know why
    Updater up(1, pvp, vds, roi, &hist, &frmUper, *logs, conf_bool[2], conf_bool[1]);
    frameRegister::setHsb(conf_float[20]);
    // End of object creation. Starts to loop.

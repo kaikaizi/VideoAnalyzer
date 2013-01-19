@@ -74,12 +74,13 @@ public:
 /**
  * @brief contents of video information book-keeping */
    struct Props {
-	int width, height, fps, fcount, codec, posFrame, depth, chan;
+	cv::Size size;
+	int fps, fcount, codec, posFrame, depth, chan;
 	float posMsec, posRatio;
 	// prevents partial init state
-	Props(const int&, const int&, const int&, const int&,
-		const int&, const float&, const float&, const int&, const
-		int&, const int&);
+	Props(const cv::Size&, const int&, const int&, const int&,
+		const float&, const float&, const int&, const int&,
+		const int&);
    }prop;
    CvCapture* cap;
 
@@ -277,6 +278,8 @@ class Logger{
 public:
    Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist& hist,
 	   VideoDFT* vd[2], const bool normVec[2])throw(ErrMsg);
+   Logger(const Logger&)=delete;
+   Logger& operator=(const Logger&)=delete;
    void update();
    /**
     * @brief retrieves history data of dynamics(ID=0-1), RMSE (2)
