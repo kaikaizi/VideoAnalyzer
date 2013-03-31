@@ -649,9 +649,6 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
    this->suf=suf; strAppend();  // prepares appName
    cvSetCaptureProperty(vp.cap,CV_CAP_PROP_POS_FRAMES,0);
    int icodec = cvGetCaptureProperty(vp.cap, CV_CAP_PROP_FOURCC); CvVideoWriter* write;
-   try{
-	write = cvCreateVideoWriter(appName, icodec, vp.prop.fps, vp.prop.size, vp.prop.chan);
-   }catch(const cv::Exception& ex){
 	char *p=reinterpret_cast<char*>(&icodec), codec[]={*p, *(p+1), *(p+2), *(p+3), 0};
 	printf("Warning: VideoRegister::save: original codec format \"%s\" not supported.", codec);
 	try{
@@ -662,7 +659,6 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
 	   write = cvCreateVideoWriter(appName, CV_FOURCC(Codec[0],Codec[1],Codec[2],Codec[3]),
 		   vp.prop.fps, vp.prop.size, vp.prop.chan);
 	}
-   }
    IplImage* frame=np>0&&noiseType>0? cvCreateImage(vp.prop.size, vp.prop.depth, vp.prop.chan):0,
 	*framePrev=df>0 ? cvCreateImage(vp.prop.size, vp.prop.depth, vp.prop.chan):0; 
    bool frameCap=false;

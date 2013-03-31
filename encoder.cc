@@ -51,7 +51,7 @@ Encoder::Xvid_t::Xvid_t(const cv::Size& size, const int& f):sz(size.width*size.h
    memset(&dec_frame,0,sizeof(xvid_dec_frame_t));
    gbl_init.debug = XVID_DEBUG_ERROR | XVID_DEBUG_STARTCODE |
 	XVID_DEBUG_HEADER | XVID_DEBUG_TIMECODE;
-   dec.fourcc=f;
+   dec.fourcc=f; dec_frame.general = XVID_DEBLOCKY | XVID_DEBLOCKUV;
    enc.width=dec.width=size.width; enc.height=dec.height=size.height;
    enc.version = dec.version = gbl_init.version = enc_stat.version =
 	dec_stat.version = enc_frame.version = dec_frame.version = XVID_VERSION;
@@ -63,7 +63,7 @@ Encoder::Xvid_t::Xvid_t(const cv::Size& size, const int& f):sz(size.width*size.h
    enc_frame.vol_flags = XVID_VOL_MPEGQUANT | XVID_VOL_EXTRASTATS |
 	XVID_VOL_QUARTERPEL | XVID_VOL_GMC | XVID_VOL_INTERLACING;
    enc_frame.motion = XVID_ME_ADVANCEDDIAMOND16 | XVID_ME_ADVANCEDDIAMOND8;
-   enc_frame.type = XVID_TYPE_AUTO;
+   enc_frame.type = XVID_TYPE_AUTO; enc_frame.input.csp = XVID_CSP_BGR;
 }
 
 void Encoder::Xvid_t::dump_stat(bool decoder)const{
@@ -73,7 +73,7 @@ void Encoder::Xvid_t::dump_stat(bool decoder)const{
 		dec_stat.data.vop.time_base, dec_stat.data.vop.time_increment,
 		dec_stat.data.vop.qscale_stride);
 	else printf("Decoder general flags=%x, width=%d, height=%d, par=%d, "
-		"par_width=%d, par_heigh=%d\n", dec_stat.data.vol.general,
+		"par_width=%d, par_height=%d\n", dec_stat.data.vol.general,
 		dec_stat.data.vol.width, dec_stat.data.vol.height, dec_stat.data.vol.par,
 		dec_stat.data.vol.par_width, dec_stat.data.vol.par_height);
    }else printf("Encoder type=%d, frame quantizer=%d, vol_flags=%x, vop_flags=%x, "
@@ -127,20 +127,36 @@ Encoder::Encoder(const char* nm[2],const VideoProp& prop, const int& codec)
 //    int nb=xvid_encore(px->enc.handle, XVID_ENC_ENCODE, &px->enc_frame, &px->enc_stat);
 //    printf("nb=%d\n",nb);
 //    for(int indx=0; indx<15; ++indx)fwrite(stream,1,used,fdest);
-
+//    IplImage* ip = cvCreateImageHeader(prop.prop.size,/*depth*/8,CV_8UC1);
+//    ip->imageData = reinterpret_cast<char*>(px->enc_frame.input.plane[0]);
+   long frm_indx=0;
    while(used){
-	if(!(consumed=fread(stream,1,buf_size-rem,fsrc)))break;
+	if(!(consumed=fread(stream+rem,1,buf_size-rem,fsrc)))break;
 	rem += consumed - (used=xvid_decore(px->dec.handle, XVID_DEC_DECODE,
 		   &px->dec_frame, &px->dec_stat));
+	if(rem)memcpy(stream, stream+rem, buf_size-rem);
+	px->dump_stat(true);
+	bool set=false; ++frm_indx;
+// 	for(int indx=0; indx<px->sz; ++indx)
+// 	   if(reinterpret_cast<char*>(px->enc_frame.input.plane[0])[indx]!=0)set=true;
+// 	   printf("%c ", reinterpret_cast<char*>(px->enc_frame.input.plane[0])[indx]);
+// 	if(frm_indx>40800 && frm_indx<40830){
+// 	   printf("%ld-th frame:%d\n", frm_indx, consumed);
+	   for(int indx=0; indx<px->sz; ++indx)
+		if(reinterpret_cast<char*>(px->enc_frame.input.plane[0])[indx])
+		   printf("%ld:%x ", indx,reinterpret_cast<char*>(px->enc_frame.input.plane[0])[indx]);
+// 	   cvShowImage("tst",ip); cvWaitKey(0);
+// 	}
+	printf("(%d),%d\n", frm_indx, consumed);
+
 	if(used<0){
-	   fputs("Decoder: ",stderr);
-	   Xvid_t::retCode(used); break;
-	}else if(used)
+	   fputs("Decoder: ",stderr); Xvid_t::retCode(used); break;
+	}/*else if(used)
 	   if((ret=xvid_encore(px->enc.handle, XVID_ENC_ENCODE, &px->enc_frame,
 		&px->enc_stat)) < 0){
 		fputs("Encoder: ",stderr); Xvid_t::retCode(ret);
 	   }
-	   else fwrite(stream,1,used,fdest);
+	   else fwrite(stream,1,used,fdest); */
    }
    if(::verbose)puts("Done");
 }

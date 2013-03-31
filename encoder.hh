@@ -22,7 +22,7 @@ public:
    Encoder(const char*[],const VideoProp&, const int&)throw(ErrMsg);
    ~Encoder();
 protected:
-   const static int buf_size=1024;
+   const static int buf_size=1024*3;
    int consumed, rem, used, ret;
    FILE *fsrc, *fdest;
    struct Xvid_t; Xvid_t* px;
