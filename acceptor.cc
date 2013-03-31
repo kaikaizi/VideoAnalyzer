@@ -29,16 +29,15 @@ extern "C"{
 char errMsg[512], FourCC[]="DIV3";
 inline void cvDisplay(volatile const int*count,const IplImage* img,
 	CvVideoWriter*write){
-   /* stage=0: prepare writer; 1: write a frame, including EOF */
    int cnt=0;
    while(*count>=0){
 	if(cnt!=*count){
 	   cnt=*count; cvShowImage("stream",img);
-	   cvWriteFrame(write, img); 
+	   write && cvWriteFrame(write, img); 
 	}
 	cvWaitKey(5);
    }
-   cvReleaseVideoWriter(&write);
+   if(write)cvReleaseVideoWriter(&write);
 }
 
 class RtpDecoder:public boost::noncopyable{
@@ -71,6 +70,7 @@ bool RtpDecoder::has_init;
 void RtpDecoder::init(const char* strm)throw(std::runtime_error){
    if(!has_init){	/* invoked only once */
 	has_init=true;
+	av_log_set_level(AV_LOG_DEBUG); /* line 130, libavutil/log.h */
 	av_register_all(); avformat_network_init();
    }
    if(avformat_open_input(&context,strm,0,0)){
@@ -85,6 +85,7 @@ void RtpDecoder::init(const char* strm)throw(std::runtime_error){
 	   context->streams[stream_index]->codec->codec_type!=
 	   AVMEDIA_TYPE_VIDEO)++stream_index;
    codec_rf=context->streams[stream_index]->codec;
+   context->streams[stream_index]->cur_dts=AV_NOPTS_VALUE;
    av_read_play(context);
    if(!(codec=avcodec_find_decoder(codec_rf->codec_id))){
 	sprintf(errMsg,"RtpDecoder::init: Codec not found.\n");
@@ -115,9 +116,9 @@ public:
 	if(fmt&&!(fmt->flags&AVFMT_NOFILE)&&context->pb)
 	   avio_close(context->pb);
 	avformat_free_context(context);
-	puts("Here");
    }
    void write_frame(AVPacket*const packet)throw(std::runtime_error){
+	puts("OK");
 	if(av_write_frame(context,packet)<0){
 	   sprintf(errMsg,"RtpDecoder::init: open2 failed.\n");
 	   throw std::runtime_error(errMsg);
@@ -187,15 +188,16 @@ public: /* VideoDecoder must outlives this */
 	av_free_packet(&packet);
    }
    typedef void(*disp_handle_t)(volatile const int*,const IplImage*,CvVideoWriter*);
-   void operator()(disp_handle_t handle,const char*fname){
-	CvVideoWriter *write;
+   void operator()(disp_handle_t handle,const char*fname,VideoCopier*vc=0){
+	CvVideoWriter *write=vc||!fname ? 0:
+	   cvCreateVideoWriter(fname,CV_FOURCC(FourCC[0],FourCC[1],FourCC[2],FourCC[3]),
+		   15,cv::Size(width,height),3);
 	if(!tp&&handle){
 	   check_exist(fname);
-	   tp=new boost::thread(boost::bind(handle,&indx,img,write=cvCreateVideoWriter(
-			   fname,CV_FOURCC(FourCC[0],FourCC[1],FourCC[2],FourCC[3]),15,
-			   cv::Size(width,height),3)));
+	   tp=new boost::thread(boost::bind(handle,&indx,img,write));
 	}
-	while(av_read_frame(rtp.getFormatContext(),&packet)>=0)
+	while(!av_read_frame(rtp.getFormatContext(),&packet)){
+	   if(vc)vc->write_frame(&packet);
 	   if(packet.stream_index==rtp.getStreamIndex() &&
 		   avcodec_decode_video2(rtp.getCodecContext(),pic,&check,&packet)>=0
 		   && check){
@@ -203,6 +205,7 @@ public: /* VideoDecoder must outlives this */
 			picbgr->data,picbgr->linesize);
 		if(++indx>=std::numeric_limits<int>::max())indx=0;
 	   }
+	}
 	indx=-1; /* signals finish */
    }
    const AVPacket& getPacket()const{return packet;}
@@ -226,23 +229,24 @@ protected:
    static void check_exist(const char*fname){
 	FILE* fp=fopen(fname,"r");
 	if(fp){
-	   fprintf(stderr,"Warning: overwriting existing file %s.\n",fname);
+	   fprintf(stderr,"Warning: overwriting file %s.\n",fname);
 	   fclose(fp);
 	}
    }
 };
 enum AVPixelFormat VideoCodec::destFormat=PIX_FMT_BGR24;
 
-int main(int argc, char* argv[]) {
-   if(argc-3)return
-	fprintf(stderr,"Usage: %s rtsp://xxx.yy.zz.m:port/file output_file\n",
-		argv[0]);
+int main(int argc, char* argv[]){
+   if(argc<2)return fprintf(stderr,
+	   "Usage: %s rtsp://xxx.yy.zz.m:port/file [output_file]\n", argv[0]);
    try{
 	RtpDecoder dec(argv[1]);
 	VideoCodec vd(dec);
-	vd(cvDisplay,argv[2]);
-// 	VideoCopier cp(dec,"new.avi");
-// 	vd(cvDisplay,&cp);
+// 	vd(cvDisplay,argc>2?argv[2]:0,0);
+	if(argc>2){
+	   VideoCopier vc(dec,argv[2]);
+	   vd(cvDisplay,argv[2],&vc);
+	}
    }catch(const std::exception ex){
 	fprintf(stderr,"Error: %s\n%s",ex.what(),errMsg);
 	return 1;
