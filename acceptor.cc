@@ -33,32 +33,31 @@ extern "C"{
 char errMsg[512], FourCC[]="DIV3";
 
 struct cvDisplay:public boost::noncopyable{
+   typedef int64_t value_type;
    cvDisplay(volatile const unsigned*count,const IplImage* img, volatile const
-	   int64_t* pts, CvVideoWriter*write,const char* url):pts(pts),
-   cnt(0),write(write),disp(img,url,count),t(boost::ref(disp)){}
+	   value_type* pts, CvVideoWriter*write,const char* url):cnt(0),write(write),
+   display(img,url,count),t(boost::ref(display)),vote(pts){}
    ~cvDisplay(){
 	if(write)cvReleaseVideoWriter(&write);
 	if(t.joinable())t.join();
    }
    void operator()(){
-	while(*disp.count)
-	   if(cnt!=*disp.count){
-		vote.entry=*pts; cnt=*disp.count;
+	while(*display.count)
+	   if(cnt!=*display.count){
+		cnt=*display.count;
 		if(write)
 		   for(int indx=vote(); indx; --indx)
-			cvWriteFrame(write,disp.image);
+			cvWriteFrame(write,display.image);
 	   }
    }
 protected:
-   typedef int64_t value_type;
-   volatile const value_type* pts;
    unsigned cnt;
    CvVideoWriter* write;
-   struct display:public boost::noncopyable{  /* avoid conflicting w. frame writer */
+   struct Display{  /* avoid conflicting w. frame writer */
 	volatile const unsigned* count;
 	const IplImage*image;
 	const char* banner;
-	display(const IplImage* img,const char* banner,volatile const unsigned* count):
+	Display(const IplImage* img,const char* banner,volatile const unsigned* count):
 	   count(count),image(img),banner(banner){}
 	void operator()()const{
 	   while(*count){
@@ -66,15 +65,15 @@ protected:
 		cvWaitKey(5);
 	   }
 	}
-   } disp;
+   } display;
    boost::thread t;
-   /* ugly hack for avcodec pts signifying frame drops */
+   /* ugly hack for avcodec pts: frame drops */
    template<typename value_type>struct Voter:public boost::noncopyable{
-	volatile value_type entry;	/* set by cvDisplay() */
-	explicit Voter():winner(0),prev(0),key(0),age(0){}
+	explicit Voter(volatile const value_type*pts):pts(pts),winner(0),
+	prev(0),key(0),age(0){}
 	int operator()(){
-	   if(entry<=0)return 1;
-	   const value_type ckey=entry-prev; prev=entry;
+	   if(*pts<=0)return 1;
+	   const value_type ckey=*pts-prev; prev=*pts;
 	   if(ckey<=0)return 1;
 	   bool found=false;
 	   For(value_type iter, Keys)
@@ -89,6 +88,7 @@ protected:
 	   return static_cast<int>(round((ckey+0.)/winner));
 	}
    protected:
+	volatile const value_type* pts;
 	value_type winner,prev,key;   /* currently determined pts */
 	std::vector<value_type> Keys;
 	int age;
@@ -253,11 +253,11 @@ public: /* VideoDecoder must outlives this */
 	if(tp)tp->join();
 	av_free_packet(&packet);
    }
-   void operator()(bool disp,const char*fname,VideoCopier*vc=0){
+   void operator()(bool show,const char*fname,VideoCopier*vc=0){
 	CvVideoWriter *write=vc||!fname ? 0:
 	   cvCreateVideoWriter(fname,CV_FOURCC(FourCC[0],FourCC[1],FourCC[2],
 			FourCC[3]),15,cv::Size(width,height),3);
-	if(disp){
+	if(show){
 	   display=boost::shared_ptr<cvDisplay>(new cvDisplay(&indx,img,
 			&packet.pts,write,rtp.name));
 	   check_exist(fname);
