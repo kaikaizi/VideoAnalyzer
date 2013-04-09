@@ -18,6 +18,8 @@
 #include <iostream>
 #include <boost/thread.hpp>
 #include <boost/utility.hpp>
+#include <boost/foreach.hpp>
+#include <boost/smart_ptr.hpp>
 extern "C"{
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
@@ -26,25 +28,81 @@ extern "C"{
 #include <cv.h>
 #include <highgui.h>
 
+#define For BOOST_FOREACH
+
 char errMsg[512], FourCC[]="DIV3";
-inline void cvDisplay(volatile const int*count,const IplImage* img,
-	CvVideoWriter*write){
-   int cnt=0;
-   while(*count>=0){
-	if(cnt!=*count){
-	   cnt=*count; cvShowImage("stream",img);
-	   write && cvWriteFrame(write, img); 
-	}
-	cvWaitKey(5);
+
+struct cvDisplay:public boost::noncopyable{
+   cvDisplay(volatile const unsigned*count,const IplImage* img, volatile const
+	   int64_t* pts, CvVideoWriter*write,const char* url):pts(pts),
+   cnt(0),write(write),disp(img,url,count),t(boost::ref(disp)){}
+   ~cvDisplay(){
+	if(write)cvReleaseVideoWriter(&write);
+	if(t.joinable())t.join();
    }
-   if(write)cvReleaseVideoWriter(&write);
-}
+   void operator()(){
+	while(*disp.count)
+	   if(cnt!=*disp.count){
+		vote.entry=*pts; cnt=*disp.count;
+		if(write)
+		   for(int indx=vote(); indx; --indx)
+			cvWriteFrame(write,disp.image);
+	   }
+   }
+protected:
+   typedef int64_t value_type;
+   volatile const value_type* pts;
+   unsigned cnt;
+   CvVideoWriter* write;
+   struct display:public boost::noncopyable{  /* avoid conflicting w. frame writer */
+	volatile const unsigned* count;
+	const IplImage*image;
+	const char* banner;
+	display(const IplImage* img,const char* banner,volatile const unsigned* count):
+	   count(count),image(img),banner(banner){}
+	void operator()()const{
+	   while(*count){
+		cvShowImage(banner,image);
+		cvWaitKey(5);
+	   }
+	}
+   } disp;
+   boost::thread t;
+   /* ugly hack for avcodec pts signifying frame drops */
+   template<typename value_type>struct Voter:public boost::noncopyable{
+	volatile value_type entry;	/* set by cvDisplay() */
+	explicit Voter():winner(0),prev(0),key(0),age(0){}
+	int operator()(){
+	   if(entry<=0)return 1;
+	   const value_type ckey=entry-prev; prev=entry;
+	   if(ckey<=0)return 1;
+	   bool found=false;
+	   For(value_type iter, Keys)
+		if(fabs(ckey-iter)/iter<.4){
+		   found=true; break;
+		}
+	   if(!found)Keys.push_back(ckey);
+	   if(++age>timeout || !key){
+		age=0;
+		winner=*std::min_element(Keys.begin(),Keys.end());
+	   }
+	   return static_cast<int>(round((ckey+0.)/winner));
+	}
+   protected:
+	value_type winner,prev,key;   /* currently determined pts */
+	std::vector<value_type> Keys;
+	int age;
+	const static int timeout=8;
+   };
+   Voter<value_type> vote;
+};
 
 class RtpDecoder:public boost::noncopyable{
 public:
-   explicit RtpDecoder(const char*strm)throw(std::runtime_error):stream_index(0),
-	context(avformat_alloc_context()),ccontext(avcodec_alloc_context3(0))
-   {init(strm);}
+   const char* name;
+   explicit RtpDecoder(const char*strm)throw(std::runtime_error):name(strm),
+   stream_index(0),context(avformat_alloc_context()),
+   ccontext(avcodec_alloc_context3(0)){init();}
    ~RtpDecoder(){
 	av_dict_free(&ccontext->metadata);
 	avformat_close_input(&context);
@@ -64,17 +122,17 @@ protected:
    AVCodecContext *ccontext, *codec_rf;
    AVCodec* codec;
    int stream_index;
-   void init(const char*)throw(std::runtime_error);
+   void init()throw(std::runtime_error);
 };
 bool RtpDecoder::has_init;
-void RtpDecoder::init(const char* strm)throw(std::runtime_error){
+void RtpDecoder::init()throw(std::runtime_error){
    if(!has_init){	/* invoked only once */
 	has_init=true;
-	av_log_set_level(AV_LOG_DEBUG); /* line 130, libavutil/log.h */
+	av_log_set_level(AV_LOG_QUIET); /* line 130, libavutil/log.h */
 	av_register_all(); avformat_network_init();
    }
-   if(avformat_open_input(&context,strm,0,0)){
-	sprintf(errMsg,"RtpDecoder::init: cannot open %s.\n",strm);
+   if(avformat_open_input(&context,name,0,0)){
+	sprintf(errMsg,"RtpDecoder::init: cannot open %s.\n",name);
 	throw std::runtime_error(errMsg);
    }
    if(avformat_find_stream_info(context,0)<0){
@@ -83,9 +141,14 @@ void RtpDecoder::init(const char* strm)throw(std::runtime_error){
    }
    while(stream_index<context->nb_streams &&
 	   context->streams[stream_index]->codec->codec_type!=
-	   AVMEDIA_TYPE_VIDEO)++stream_index;
+	   AVMEDIA_TYPE_VIDEO)
+// 	AVDISCARD_NONE AVDISCARD_DEFAULT AVDISCARD_NONREF AVDISCARD_BIDIR
+// 	   AVDISCARD_NONKEY AVDISCARD_ALL
+// 	context->streams[stream_index]->discard=AVDISCARD_BIDIR;
+	++stream_index;
    codec_rf=context->streams[stream_index]->codec;
    context->streams[stream_index]->cur_dts=AV_NOPTS_VALUE;
+   context->flags|=AVFMT_FLAG_DISCARD_CORRUPT|AVFMT_FLAG_MP4A_LATM;
    av_read_play(context);
    if(!(codec=avcodec_find_decoder(codec_rf->codec_id))){
 	sprintf(errMsg,"RtpDecoder::init: Codec not found.\n");
@@ -101,7 +164,7 @@ void RtpDecoder::init(const char* strm)throw(std::runtime_error){
    }
 }
 
-// TODO: cannot figure out how to pipe read contents to output
+// TODO: cannot figure out how to pipe read packets to output
 class VideoCopier:public boost::noncopyable{
 public:
    VideoCopier(const RtpDecoder& rtp, const char*fname)throw(std::runtime_error):
@@ -118,7 +181,7 @@ public:
 	avformat_free_context(context);
    }
    void write_frame(AVPacket*const packet)throw(std::runtime_error){
-	puts("OK");
+	// crashes before here, after init()
 	if(av_write_frame(context,packet)<0){
 	   sprintf(errMsg,"RtpDecoder::init: open2 failed.\n");
 	   throw std::runtime_error(errMsg);
@@ -154,9 +217,12 @@ void VideoCopier::init(const char*fname)throw(std::runtime_error){
 	throw std::runtime_error(errMsg);
    }
    for(int cnt=0;cnt<context->nb_streams;++cnt)
-	if(context->streams[cnt]->codec->codec_type==AVMEDIA_TYPE_VIDEO)
+	if(context->streams[cnt]->codec->codec_type==AVMEDIA_TYPE_VIDEO){
 	   context->streams[cnt]->sample_aspect_ratio.num=context->streams[cnt]->
 		codec->sample_aspect_ratio.num;
+	   context->streams[cnt]->sample_aspect_ratio.den=context->streams[cnt]->
+		codec->sample_aspect_ratio.den;
+	}
    if(!codec){
 	sprintf(errMsg,"VideoCopier::init: Codec not found.\n");
 	throw std::runtime_error(errMsg);
@@ -169,6 +235,8 @@ void VideoCopier::init(const char*fname)throw(std::runtime_error){
    }
 }
 
+/* NOTE: line 341-359, ffmpeg/libavformats/rtpdec_jpeg.c for
+ * error msgs on frame dropping */
 class VideoCodec:public boost::noncopyable{
 public: /* VideoDecoder must outlives this */
    explicit VideoCodec(RtpDecoder& rtp):rtp(rtp),pic(avcodec_alloc_frame()),
@@ -176,25 +244,25 @@ public: /* VideoDecoder must outlives this */
    height(rtp.getCodecContext()->height),picture_buf(reinterpret_cast<uint8_t*>
 	   (av_malloc(avpicture_get_size(destFormat,width, height)))),
    img_context_ctx(sws_getContext(width,height,rtp.getCodecContext()->pix_fmt,width,
-		height,destFormat,SWS_BICUBIC,0,0,0)),indx(0),check(0),tp(0),
+		height,destFormat,SWS_BICUBIC,0,0,0)),indx(1),check(0),
    img(cvCreateImageHeader(cv::Size(width,height),8,3)){init();}
    ~VideoCodec(){
 	av_free(pic); av_free(picbgr); av_free(picture_buf);
 	sws_freeContext(img_context_ctx);
 	cvReleaseImageHeader(&img);
-	if(tp){
-	   tp->join(); delete tp;
-	}
+	if(tp)tp->join();
 	av_free_packet(&packet);
    }
-   typedef void(*disp_handle_t)(volatile const int*,const IplImage*,CvVideoWriter*);
-   void operator()(disp_handle_t handle,const char*fname,VideoCopier*vc=0){
+   void operator()(bool disp,const char*fname,VideoCopier*vc=0){
 	CvVideoWriter *write=vc||!fname ? 0:
-	   cvCreateVideoWriter(fname,CV_FOURCC(FourCC[0],FourCC[1],FourCC[2],FourCC[3]),
-		   15,cv::Size(width,height),3);
-	if(!tp&&handle){
+	   cvCreateVideoWriter(fname,CV_FOURCC(FourCC[0],FourCC[1],FourCC[2],
+			FourCC[3]),15,cv::Size(width,height),3);
+	if(disp){
+	   display=boost::shared_ptr<cvDisplay>(new cvDisplay(&indx,img,
+			&packet.pts,write,rtp.name));
 	   check_exist(fname);
-	   tp=new boost::thread(boost::bind(handle,&indx,img,write));
+	   tp=boost::shared_ptr<boost::thread>(new boost::thread(
+			boost::ref(*display)));
 	}
 	while(!av_read_frame(rtp.getFormatContext(),&packet)){
 	   if(vc)vc->write_frame(&packet);
@@ -203,10 +271,10 @@ public: /* VideoDecoder must outlives this */
 		   && check){
 		if(tp)sws_scale(img_context_ctx,pic->data,pic->linesize,0,height,
 			picbgr->data,picbgr->linesize);
-		if(++indx>=std::numeric_limits<int>::max())indx=0;
+		if(++indx==std::numeric_limits<unsigned>::max())indx=1;
 	   }
 	}
-	indx=-1; /* signals finish */
+	indx=0; /* signals finish */
    }
    const AVPacket& getPacket()const{return packet;}
 protected:
@@ -215,8 +283,10 @@ protected:
    const int &width,&height;
    uint8_t* picture_buf;
    SwsContext* img_context_ctx;
-   int indx,check;
-   boost::thread* tp;
+   int check;
+   unsigned indx;
+   boost::shared_ptr<boost::thread> tp;
+   boost::shared_ptr<cvDisplay> display;
    IplImage* img;
    AVPacket packet;
    static enum AVPixelFormat destFormat;	/* line 66, libavutil/pixfmt.h */
@@ -242,11 +312,11 @@ int main(int argc, char* argv[]){
    try{
 	RtpDecoder dec(argv[1]);
 	VideoCodec vd(dec);
-// 	vd(cvDisplay,argc>2?argv[2]:0,0);
-	if(argc>2){
-	   VideoCopier vc(dec,argv[2]);
+	vd(true,argc>2?argv[2]:0,0);
+/* 	if(argc>2){
+	VideoCopier vc(dec,argv[2]);
 	   vd(cvDisplay,argv[2],&vc);
-	}
+ 	}*/
    }catch(const std::exception ex){
 	fprintf(stderr,"Error: %s\n%s",ex.what(),errMsg);
 	return 1;
