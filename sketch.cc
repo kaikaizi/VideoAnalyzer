@@ -75,11 +75,8 @@ void roiMouseCallBack(const int* params, myROI& roi) {
 	}
 	fname[strlen(fname)-1]=0;
 	if(strcmp(fname+strlen(fname)-4,".msk")) strcat(fname,".msk");
+	check_exist(fname);
 	FILE* fp;
-	if((fp=fopen(fname,"r"))){
-	   fprintf(stderr,"Warning: %s already exists.\n", fname);
-	   fflush(stderr); fclose(fp);
-	}
 	if(!(fp=fopen(fname, "w"))){
 	   sprintf(msg, "roiMouseCallBack: cannot write to file %s\n", fname);
 	   throw ErrMsg(msg);

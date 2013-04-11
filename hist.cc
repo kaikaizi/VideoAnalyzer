@@ -432,3 +432,10 @@ const IplImage* frameBuffer::get(const int& indx, const bool& first, const
    return *iter;
 }
 
+void check_exist(const char*fname){
+   FILE* fp=fopen(fname,"r");
+   if(fp){
+	fprintf(stderr,"Warning: overwriting file %s.\n",fname);
+	fclose(fp);
+   }
+}

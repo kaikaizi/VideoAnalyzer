@@ -1,5 +1,5 @@
 CC:=c++		# add starting from binutils-2.22
-LDFLAGS:=$(shell pkg-config --cflags --libs opencv) -lX11 -lxvidcore -std=c++0x
+LDFLAGS:=$(shell pkg-config --cflags --libs opencv) -lavutil -lavcodec -lavformat -lswscale -lboost_system -lboost_thread -lpthread -lX11
 CXXFLAGS:=-I/usr/include/opencv -I/usr/include/opencv2 -std=c++0x -O3
 .SUFFIX:.o .cc
 

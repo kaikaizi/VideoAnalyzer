@@ -15,7 +15,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 #include "dynan.hh"
-#include "encoder.hh"
 #include <fstream>
 #include <ctime>
 #include <iostream>
@@ -650,15 +649,17 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
    cvSetCaptureProperty(vp.cap,CV_CAP_PROP_POS_FRAMES,0);
    int icodec = cvGetCaptureProperty(vp.cap, CV_CAP_PROP_FOURCC); CvVideoWriter* write;
 	char *p=reinterpret_cast<char*>(&icodec), codec[]={*p, *(p+1), *(p+2), *(p+3), 0};
-	printf("Warning: VideoRegister::save: original codec format \"%s\" not supported.", codec);
-	try{
+	printf("Warning: VideoRegister::save: original codec format \"%s\" not supported.\n", codec);
+/*	try{
 	   const char* nms[]={fname,appName};
 	   Encoder enc(nms, vp, icodec); return;
 	}catch(const ErrMsg& ex){
 	   printf("runtime error: %s\nFall back to \"%s\" codec option.\n", ex.what(), Codec);
 	   write = cvCreateVideoWriter(appName, CV_FOURCC(Codec[0],Codec[1],Codec[2],Codec[3]),
 		   vp.prop.fps, vp.prop.size, vp.prop.chan);
-	}
+	} */
+	write = cvCreateVideoWriter(appName, CV_FOURCC(Codec[0],Codec[1],Codec[2],Codec[3]),
+		vp.prop.fps, vp.prop.size, vp.prop.chan);
    IplImage* frame=np>0&&noiseType>0? cvCreateImage(vp.prop.size, vp.prop.depth, vp.prop.chan):0,
 	*framePrev=df>0 ? cvCreateImage(vp.prop.size, vp.prop.depth, vp.prop.chan):0; 
    bool frameCap=false;

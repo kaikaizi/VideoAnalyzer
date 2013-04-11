@@ -15,154 +15,156 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
-#include <xvid.h>
 #include "encoder.hh"
-#include "dynan.hh"
-extern char msg[256];
+#include <boost/foreach.hpp>
+#define For BOOST_FOREACH
 extern bool verbose;
 
-struct Encoder::Xvid_t{
-   Xvid_t(const cv::Size&, const int&);
-   ~Xvid_t(){
-	if(!xvid_encore(&enc.handle,XVID_ENC_DESTROY,0,0))	// XXX
-	   fprintf(stderr,"encoder dtor: encoder destruction failed.");
-	assert(0);
-	if(!xvid_decore(&dec.handle,XVID_DEC_DESTROY,0,0))
-	   fprintf(stderr,"encoder dtor: decoder destruction failed.");
+void cvDisplay::operator()(){
+   while(*display.count)
+	if(cnt!=*display.count&&(cnt=*display.count)&&write)
+	   for(int indx=vote(); indx; --indx)
+		cvWriteFrame(write,display.image);
+}
+void cvDisplay::Display::operator()()const{
+   while(*count){
+	cvShowImage(banner,image);
+	cvWaitKey(5);
    }
-   inline void dump_stat(bool decoder)const;
-   inline static void retCode(int);
-   xvid_gbl_init_t gbl_init;
-   xvid_dec_create_t dec;
-   xvid_enc_create_t enc;
-   xvid_enc_stats_t enc_stat;
-   xvid_dec_stats_t dec_stat;
-   xvid_enc_frame_t enc_frame;
-   xvid_dec_frame_t dec_frame;
-   const int sz;
-};
-
-Encoder::Xvid_t::Xvid_t(const cv::Size& size, const int& f):sz(size.width*size.height){
-   memset(&gbl_init,0,sizeof(xvid_gbl_init_t));
-   memset(&enc,0,sizeof(xvid_enc_create_t)); memset(&dec,0,sizeof(xvid_dec_create_t));
-   memset(&enc_stat,0,sizeof(xvid_enc_stats_t));
-   memset(&dec_stat,0,sizeof(xvid_dec_stats_t));
-   memset(&enc_frame,0,sizeof(xvid_enc_frame_t));
-   memset(&dec_frame,0,sizeof(xvid_dec_frame_t));
-   gbl_init.debug = XVID_DEBUG_ERROR | XVID_DEBUG_STARTCODE |
-	XVID_DEBUG_HEADER | XVID_DEBUG_TIMECODE;
-   dec.fourcc=f; dec_frame.general = XVID_DEBLOCKY | XVID_DEBLOCKUV;
-   enc.width=dec.width=size.width; enc.height=dec.height=size.height;
-   enc.version = dec.version = gbl_init.version = enc_stat.version =
-	dec_stat.version = enc_frame.version = dec_frame.version = XVID_VERSION;
-   enc.fincr=1; enc.fbase=15;	// fps=fincr/fbase ?
-   enc.profile = XVID_PROFILE_S_L0; enc.global = XVID_GLOBAL_PACKED;
-   dec_stat.type = XVID_TYPE_NOTHING;
-   enc_frame.vop_flags = XVID_VOP_INTER4V | XVID_VOP_TOPFIELDFIRST |
-	XVID_VOP_ALTERNATESCAN | XVID_VOP_RD_BVOP | XVID_VOP_DEBUG;
-   enc_frame.vol_flags = XVID_VOL_MPEGQUANT | XVID_VOL_EXTRASTATS |
-	XVID_VOL_QUARTERPEL | XVID_VOL_GMC | XVID_VOL_INTERLACING;
-   enc_frame.motion = XVID_ME_ADVANCEDDIAMOND16 | XVID_ME_ADVANCEDDIAMOND8;
-   enc_frame.type = XVID_TYPE_AUTO; enc_frame.input.csp = XVID_CSP_BGR;
+}
+template<typename T>
+int cvDisplay::Voter<T>::operator()(){
+   if(*pts<=0)return 0;
+   const value_type ckey=*pts-prev; prev=*pts;
+   if(ckey<=0)return 0;
+   bool found=false;
+   For(value_type iter, Keys)
+	if(fabs(ckey-iter)/iter<.4){
+	   found=true; break;
+	}
+   if(!found)Keys.push_back(ckey);
+   if(++age>timeout || !key){
+	age=0;
+	winner=*std::min_element(Keys.begin(),Keys.end());
+   }
+   return std::min(max_delay_frame,
+	   static_cast<int>(round((ckey+0.)/winner)));
 }
 
-void Encoder::Xvid_t::dump_stat(bool decoder)const{
-   if(decoder){
-	if(dec_stat.type>0)printf("Decoder general flags=%x, time_base=%d, "
-		"time_increment=%d, qscale_stride=%d\n", dec_stat.data.vop.general,
-		dec_stat.data.vop.time_base, dec_stat.data.vop.time_increment,
-		dec_stat.data.vop.qscale_stride);
-	else printf("Decoder general flags=%x, width=%d, height=%d, par=%d, "
-		"par_width=%d, par_height=%d\n", dec_stat.data.vol.general,
-		dec_stat.data.vol.width, dec_stat.data.vol.height, dec_stat.data.vol.par,
-		dec_stat.data.vol.par_width, dec_stat.data.vol.par_height);
-   }else printf("Encoder type=%d, frame quantizer=%d, vol_flags=%x, vop_flags=%x, "
-	   "frame length=%d, header lenght=%d bytes, #block_intra=%d, #block_inter=%d, "
-	   "#block_notCoded=%d, SSE_YUV=(%d %d %d)\n", enc_stat.type, enc_stat.quant,
-	   enc_stat.vol_flags, enc_stat.vop_flags, enc_stat.length, enc_stat.hlength,
-	   enc_stat.kblks, enc_stat.mblks, enc_stat.ublks, enc_stat.sse_y,
-	   enc_stat.sse_u, enc_stat.sse_v);
-}
-
-void Encoder::Xvid_t::retCode(int code){
-   if(code<0)switch(code){
-	case XVID_ERR_FAIL: fputs("general fault\n", stderr); return;
-	case XVID_ERR_MEMORY: fputs("memory allocation error\n", stderr); return;
-	case XVID_ERR_FORMAT: fputs("file format error\n", stderr); return;
-	case XVID_ERR_VERSION: fputs("structure version not supported\n", stderr); return;
-	case XVID_ERR_END: fputs("encoder: end of stream reached\n", stderr); return;
-	default: fprintf(stderr,"unknown error code %d\n",code);
+bool RtpDecoder::has_init;
+void RtpDecoder::init()throw(std::runtime_error){
+   if(!has_init){	/* invoked only once */
+	has_init=true;
+	av_log_set_level(AV_LOG_QUIET); /* line 130, libavutil/log.h */
+	av_register_all(); avformat_network_init();
+   }
+   if(avformat_open_input(&context,name,0,0)){
+	sprintf(msg,"RtpDecoder::init: cannot open %s.\n",name);
+	throw std::runtime_error(msg);
+   }
+   if(avformat_find_stream_info(context,0)<0){
+	sprintf(msg,"RtpDecoder::init: Cannot find stream info.\n");
+	throw std::runtime_error(msg);
+   }
+   while(stream_index<context->nb_streams &&
+	   context->streams[stream_index]->codec->codec_type!=
+	   AVMEDIA_TYPE_VIDEO)
+// 	AVDISCARD_NONE AVDISCARD_DEFAULT AVDISCARD_NONREF AVDISCARD_BIDIR
+// 	   AVDISCARD_NONKEY AVDISCARD_ALL
+// 	context->streams[stream_index]->discard=AVDISCARD_BIDIR;
+	++stream_index;
+   codec_rf=context->streams[stream_index]->codec;
+   context->streams[stream_index]->cur_dts=AV_NOPTS_VALUE;
+   context->flags|=AVFMT_FLAG_DISCARD_CORRUPT|AVFMT_FLAG_MP4A_LATM;
+   av_read_play(context);
+   if(!(codec=avcodec_find_decoder(codec_rf->codec_id))){
+	sprintf(msg,"RtpDecoder::init: Codec not found.\n");
+	throw std::runtime_error(msg);
+   }
+   codec_rf->flags|=codec->capabilities&CODEC_CAP_TRUNCATED;
+   avcodec_get_context_defaults3(ccontext,codec);
+   avcodec_copy_context(ccontext,codec_rf);
+   av_dict_set(&ccontext->metadata,"b","2M",0);
+   if(avcodec_open2(ccontext,codec,&ccontext->metadata)<0){
+	sprintf(msg,"RtpDecoder::init: open2 failed.\n");
+	throw std::runtime_error(msg);
    }
 }
 
-Encoder::Encoder(const char* nm[2],const VideoProp& prop, const int& codec)
-   throw(ErrMsg):rem(0),used(1),px(new Xvid_t(prop.prop.size,codec)),
-   stream(new char[buf_size]),plane(new char[px->sz*4]),fsrc(fopen(nm[0],"rb")),
-   fdest(fopen(nm[1],"wb")){
-   if(!nm || !nm[0] || !nm[1])throw
-	ErrMsg("encoder ctor: invalid input/output file names.");
-   if(!fsrc || !fdest){
-	sprintf(msg,"encoder ctor: cannot open file %s for %s.\n",
-		fsrc?nm[1]:nm[0], fsrc?"writing":"reading");
-	if(fsrc)fclose(fsrc);
-	else if(fdest)fclose(fdest);
-	throw ErrMsg(msg);
+enum AVPixelFormat VideoCodec::destFormat=PIX_FMT_BGR24;
+char VideoCodec::Codec[5]="DIV3";
+void VideoCopier::init(const char*fname)throw(std::runtime_error){
+   if(!fmt){
+	sprintf(msg,"VideoCopier::init: Output format not found.\n");
+	throw std::runtime_error(msg);
    }
-   if(xvid_global(0,XVID_GBL_INIT, &px->gbl_init,0))
-	throw ErrMsg("ctor::xvid_global failed.");
-   px->enc_frame.bitstream=px->dec_frame.bitstream=stream;
-   px->enc_frame.length=px->dec_frame.length=buf_size;
-   if(xvid_decore(0,XVID_DEC_CREATE, &px->dec,0))
-	throw ErrMsg("encoder ctor: decoder creation failed.");
-   px->enc_frame.input.stride[0] = px->dec_frame.output.stride[0] = px->dec.width;
-   px->enc_frame.input.plane[1] = px->dec_frame.output.plane[1] = reinterpret_cast<char*>
-	(px->enc_frame.input.plane[0]=px->dec_frame.output.plane[0]=plane) + px->sz;
-   px->enc_frame.input.plane[2] = px->dec_frame.output.plane[2] = reinterpret_cast<char*>
-	(px->dec_frame.output.plane[1]) + px->sz;
-   px->enc_frame.input.plane[3] = px->dec_frame.output.plane[3] = reinterpret_cast<char*>
-	(px->dec_frame.output.plane[2]) + px->sz;
-   if(xvid_encore(0, XVID_ENC_CREATE, &px->enc, 0))
-	throw ErrMsg("encoder ctor: encoder creation failed.");
-   if(::verbose)puts("Converting...");
-//    int nb=xvid_encore(px->enc.handle, XVID_ENC_ENCODE, &px->enc_frame, &px->enc_stat);
-//    printf("nb=%d\n",nb);
-//    for(int indx=0; indx<15; ++indx)fwrite(stream,1,used,fdest);
-//    IplImage* ip = cvCreateImageHeader(prop.prop.size,/*depth*/8,CV_8UC1);
-//    ip->imageData = reinterpret_cast<char*>(px->enc_frame.input.plane[0]);
-   long frm_indx=0;
-   while(used){
-	if(!(consumed=fread(stream+rem,1,buf_size-rem,fsrc)))break;
-	rem += consumed - (used=xvid_decore(px->dec.handle, XVID_DEC_DECODE,
-		   &px->dec_frame, &px->dec_stat));
-	if(rem)memcpy(stream, stream+rem, buf_size-rem);
-	px->dump_stat(true);
-	bool set=false; ++frm_indx;
-// 	for(int indx=0; indx<px->sz; ++indx)
-// 	   if(reinterpret_cast<char*>(px->enc_frame.input.plane[0])[indx]!=0)set=true;
-// 	   printf("%c ", reinterpret_cast<char*>(px->enc_frame.input.plane[0])[indx]);
-// 	if(frm_indx>40800 && frm_indx<40830){
-// 	   printf("%ld-th frame:%d\n", frm_indx, consumed);
-	   for(int indx=0; indx<px->sz; ++indx)
-		if(reinterpret_cast<char*>(px->enc_frame.input.plane[0])[indx])
-		   printf("%ld:%x ", indx,reinterpret_cast<char*>(px->enc_frame.input.plane[0])[indx]);
-// 	   cvShowImage("tst",ip); cvWaitKey(0);
-// 	}
-	printf("(%d),%d\n", frm_indx, consumed);
-
-	if(used<0){
-	   fputs("Decoder: ",stderr); Xvid_t::retCode(used); break;
-	}/*else if(used)
-	   if((ret=xvid_encore(px->enc.handle, XVID_ENC_ENCODE, &px->enc_frame,
-		&px->enc_stat)) < 0){
-		fputs("Encoder: ",stderr); Xvid_t::retCode(ret);
-	   }
-	   else fwrite(stream,1,used,fdest); */
+   memcpy(context,rtp.getFormatContext(),sizeof*rtp.getFormatContext());
+   memcpy(ccontext,rtp.getCodecContext(),sizeof*rtp.getCodecContext());
+   fmt->video_codec=context->video_codec_id;
+   fmt->audio_codec=context->audio_codec_id;
+   fmt->subtitle_codec=context->subtitle_codec_id;
+   fmt->video_codec=context->video_codec_id;
+   context->oformat=fmt; context->iformat=0;
+   snprintf(context->filename,sizeof(context->filename),"%s",fname);
+   av_dict_set(&ccontext->metadata,"b","2M",0);
+   sprintf(msg,"%dx%d",ccontext->width,ccontext->height);
+   av_dict_set(&ccontext->metadata,"video_size",msg,0);
+   if(!(fmt->flags&AVFMT_NOFILE)&&avio_open(&context->pb,context->filename,
+		AVIO_FLAG_WRITE)<0){
+	sprintf(msg,"VideoCopier::init: avio open failed.\n");
+	throw std::runtime_error(msg);
    }
-   if(::verbose)puts("Done");
+   for(int cnt=0;cnt<context->nb_streams;++cnt)
+	if(context->streams[cnt]->codec->codec_type==AVMEDIA_TYPE_VIDEO){
+	   context->streams[cnt]->sample_aspect_ratio.num=context->streams[cnt]->
+		codec->sample_aspect_ratio.num;
+	   context->streams[cnt]->sample_aspect_ratio.den=context->streams[cnt]->
+		codec->sample_aspect_ratio.den;
+	}
+   if(!codec){
+	sprintf(msg,"VideoCopier::init: Codec not found.\n");
+	throw std::runtime_error(msg);
+   }else if(avcodec_open2(ccontext,codec,&ccontext->metadata)<0){
+	sprintf(msg,"VideoCopier::init: open2 failed.\n");
+	throw std::runtime_error(msg);
+   }else if(avformat_write_header(context,&ccontext->metadata)<0){
+	sprintf(msg,"VideoCopier::init: cannot write header.\n");
+	throw std::runtime_error(msg);
+   }
+}
+void VideoCodec::operator()(bool show,const char*fname,VideoCopier*vc){
+   CvVideoWriter *write=vc||!fname ? 0:
+	cvCreateVideoWriter(fname,CV_FOURCC(Codec[0],Codec[1],
+		   Codec[2],Codec[3]),15,cv::Size(width,height),3);
+   if(show){
+	display=boost::shared_ptr<cvDisplay>(new cvDisplay(&indx,img,
+		   &packet.pts,write,rtp.name));
+	check_exist(fname);
+	tp=boost::shared_ptr<boost::thread>(new boost::thread(
+		   boost::ref(*display)));
+   }
+   while(!av_read_frame(rtp.getFormatContext(),&packet)){
+	if(vc)vc->write_frame(&packet);
+	if(packet.stream_index==rtp.getStreamIndex() &&
+		avcodec_decode_video2(rtp.getCodecContext(),pic,&check,&packet)>=0
+		&& check){
+	   if(tp)sws_scale(img_context_ctx,pic->data,pic->linesize,0,height,
+		   picbgr->data,picbgr->linesize);
+	   if(++indx==std::numeric_limits<unsigned>::max())indx=1;
+	}
+   }
+   indx=0; /* signals finish */
 }
 
-Encoder::~Encoder(){
-   fclose(fsrc); fclose(fdest);
-   delete px;
-   delete[]plane; delete[]stream;
+int rtsp_client(const char* url, const char* fname){
+   RtpDecoder dec(url);
+   VideoCodec vd(dec);
+   vd(true,strcmp(fname,"-")?fname:0,0);
+   return 0;
 }
+
+// AVOutputFormat: line 380, libavformat/avformat.h
+// AVStream: line 646
+// AVFormatContext: line 941
+// AVFrame: line 1099, libavformat/avformat.h
+// AVCodecContext: line 1561 libavcodec/avcodec.h

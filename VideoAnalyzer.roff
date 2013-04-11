@@ -15,7 +15,7 @@
 .\"    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 .\" Manpage for VideoAnalyzer
 
-.TH man 1 "Dec 2012" "version 1.0" "VideoAnalyzer man page"
+.TH man 1 "Dec 2012" "version 1.1" "VideoAnalyzer man page"
 
 .SH NAME
 VideoAnalyzer \- Analyze performance degradation of medical video transmission
@@ -27,7 +27,7 @@ VideoAnalyzer \- Analyze performance degradation of medical video transmission
 .br
 .BI "[-g/--gen-conf] [-G/--gen-video] [-p/--prepend] [-r/--register " reference "] [-v/--verbose]"
 .br
-.BI "[--simulate] " Video
+.BI "[--simulate] [--as-client " url "]" Video
 .sp
 .in -4n
 
@@ -143,6 +143,20 @@ domain features and frame-wise registration quantity of frame pair when switched
 Simulates frame drop. Similar to
 .BI --compare
 mode except that a probablistic model in configuration file is used to determine which frames in the second capture are forced to be missed. No frame drop occurs in the first capture of the video.
+.PP
+.BI "--as-client" url
+.br
+Works as a RTSP client. The url in form of
+.BI rtsp://xxx.yyy.zz.mm:port/file
+must be given. The server works best with
+.BI ffserver
+of
+.BI ffmpeg.
+In this case, the
+.BI Video
+argument is the file to be saved (or not, when it is set to
+.BI -.
+).
 
 ."brief internals
 .SH CONFIGURATIONS

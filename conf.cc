@@ -17,6 +17,7 @@
 #include <getopt.h>
 #include "sketch.hh"
 #include "conf.hh"
+#include "encoder.hh"
 char msg[256];
 bool verbose;
 
@@ -241,6 +242,7 @@ int loadConf::parseline(FILE* fd){
 	// No need/way to manually set codec option
 	strcpy(VideoRegister::Codec, confdata.File_VideoCodec);
 	strcpy(createAnimation::Codec, confdata.File_VideoCodec);
+	strcpy(VideoCodec::Codec, confdata.File_VideoCodec);
    }else if(!strcmp("File.Mask",option))strcpy(confdata.File_Mask,value);
    else if(!strcmp("Noise.Type",option)){
 	if(!strcasecmp("none",value))			confdata.Noise_Type = 0;
@@ -354,7 +356,7 @@ void loadConf::get(bool bools[BoolCap], int ints[IntCap], char& chars, char*
 void help(const char* progname){
    printf("Usage: %s [-c/--compare primary transmitted] [-C/--conf conf-name] [-d/--diff-mode n]\n"
 	   "[-g/--gen-conf] [-G/--gen-video] [-p/--prepend] [-r/--register reference] [-v/--verbose]\n"
-	   "[--simulate] Video\n", progname);
+	   "[--simulate] [--as-client url ] Video\n", progname);
    puts("-c/--compare transmitted primary: Compares video quality degradation.");
    puts("-C/--conf conf-name: use given name, overriding \"VideoAnalyzer.conf\"");
    puts("-d/--diff-mode n: self-comparison differential mode, treating two frame with "
@@ -367,6 +369,8 @@ void help(const char* progname){
 	   "\"reference\" and save registered video to a new file.");
    puts("-v/--verbose: prints more information in processing");
    puts("--simulate: simulates frame dropping as the secondary video.");
+   puts("--as-client: work as RTSP client to display/save streamed video.\n"
+	   "Use - to suppress video saving.");
 }
 
 int cv_getopt(int argc, char* argv[], char* optargs[5], int16_t& status){
@@ -384,31 +388,27 @@ int cv_getopt(int argc, char* argv[], char* optargs[5], int16_t& status){
 	{"verbose",	 no_argument,	   0,	   'v'},
 	{"compare",	 required_argument,  0,	   'c'},
 	{"diff-mode",required_argument,  0,    'd'},
+	{"as-client",required_argument,&opt_flag,2},
 	{0,		 0,			   0,	    0 }};
    while(true){
 	if((c=getopt_long(argc,argv,"c:C:d:gGpr:v",long_options,&option_index))==-1)
 	   break;
 	switch(c){
 	   case 0:
-		if(opt_flag=*long_options[option_index].flag){
-		   status |= opt_flag; break;
-		}
+		if(opt_flag=*long_options[option_index].flag && (status|=opt_flag)&2)
+		   return rtsp_client(optarg,argv[optind]);
 	   case 'C':
-		strcpy(confname, optarg); confname[strlen(optarg)]=0;
-		status |= 0x2; break;
+		strcpy(confname, optarg); status |= 0x2; break;
 	   case 'g': status |= 0x4; break;
 	   case 'p': status |= 0x8; break;
 	   case 'r':
-		strcpy(reference, optarg); reference[strlen(optarg)]=0;
-		status |= 0x10; break;
+		strcpy(reference, optarg); status |= 0x10; break;
 	   case 'v': verbose=true; break;
 	   case 'c':
-		strcpy(cmp, optarg); cmp[strlen(optarg)]=0;
-		status |= 0x40; break;
+		strcpy(cmp, optarg); status |= 0x40; break;
 	   case 'G': status |= 0x80; break;
 	   case 'd':
-		strcpy(diff_n, optarg); diff_n[strlen(optarg)]=0;
-		status |=0x100; break;
+		strcpy(diff_n, optarg); status |=0x100; break;
 	   default: help(argv[0]); return 0;
 	}
    }
@@ -445,7 +445,7 @@ int cv_getopt(int argc, char* argv[], char* optargs[5], int16_t& status){
 	}else fclose(fp);
    }
    if(status&0x80)return 1;
-   strcpy(main_arg, argv[optind]); main_arg[strlen(argv[optind])]=0;
+   strcpy(main_arg,argv[optind]);
    return 1;
 }
 

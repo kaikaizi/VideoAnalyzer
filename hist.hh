@@ -354,3 +354,5 @@ protected:
    frameSizeEq* fse;
    void init();
 };
+
+void check_exist(const char*);
