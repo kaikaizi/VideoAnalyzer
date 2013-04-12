@@ -20,7 +20,13 @@
 #include <cv.h>
 #include <highgui.h>
 #include <boost/tuple/tuple.hpp>
+#include <boost/foreach.hpp>
+#include <boost/thread.hpp>
 #include "sketch.hh"
+#define For BOOST_FOREACH
+
+void check_exist(const char*);
+void join_thread(boost::thread& t);
 
 /**
  * @relates Hist
@@ -354,5 +360,3 @@ protected:
    frameSizeEq* fse;
    void init();
 };
-
-void check_exist(const char*);

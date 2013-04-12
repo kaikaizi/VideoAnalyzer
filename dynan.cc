@@ -15,11 +15,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 #include "dynan.hh"
-#include <fstream>
-#include <ctime>
-#include <iostream>
-#include <boost/foreach.hpp>
-#define For BOOST_FOREACH
+#include <boost/dynamic_bitset.hpp>
 
 extern char msg[256];
 
@@ -308,7 +304,8 @@ frameSizeEq::frameSizeEq(IplImage* pfrm[2]):iframe1(pfrm[0]),iframe2(pfrm[1]),
    if(img1Created){	   /* enlarge iframe1 */
 	oframe1 = cvCreateImage(cvGetSize(iframe2),iframe2->depth,iframe2->nChannels);
 	cvResize(iframe1, oframe1, InterpMethod);
-	if(img1Cvt)cvt2Gray(oframe1);	// `cvCvtColor' doesn't support in-place conversion
+	if(img1Cvt)cvt2Gray(oframe1);
+	// `cvCvtColor' doesn't support in-place conversion
    }
    if(img2Created) {
 	oframe2 = cvCreateImage(cvGetSize(iframe1),iframe1->depth,iframe1->nChannels);
@@ -341,22 +338,85 @@ void frameSizeEq::update(const bool& first) {
 
 // ++++++++++++++++++++++++++++++++++++++++
 
+class mt:boost::noncopyable{
+public:
+   const static int minCalcPerThread=16;
+   const int nThread, nTask;
+   volatile int startpos, endpos;	/* writeable by frameRegister ONLY */
+   typedef struct ordered_thread{
+	unsigned id;
+	boost::thread t;
+	CvCapture* cap;
+	ordered_thread(unsigned i,boost::thread t,CvCapture* c):
+	   id(i),t(boost::move(t)),cap(c){}
+   }ordered_thread;
+   boost::dynamic_bitset<> finish;
+   boost::mutex m;
+   static bool runnable;
+   explicit mt(frameRegister& f):nThread((!runnable||f.range<=minCalcPerThread)?0:
+	   std::min<int>(f.range/minCalcPerThread,boost::thread::
+	   hardware_concurrency())),nTask(nThread?(f.range*2+1)/nThread:0),
+		startpos(0),endpos(0),finish(nThread),reg(f){
+	printf("%d threads\n",nThread);
+	for(unsigned id=0; id<nThread; ++id){
+	   ordered_thread o(id,boost::thread(),cvCreateFileCapture(reg.destFile));
+	   o.t=boost::thread(boost::bind(&mt::run,this,boost::ref(o)));
+	   threads.push_back(boost::move(o));
+	}
+   }
+   ~mt(){
+	std::for_each(threads.begin(),threads.end(),mt::destruct_threads);
+   }
+protected:
+   std::vector<ordered_thread> threads;
+   frameRegister& reg;
+   void run(ordered_thread& t){
+	const int beg=t.id*nTask, end=std::min<int>(reg.range*2+1,(t.id+1)*nTask-1);
+	IplImage* frame2;
+	int cur, cend;	/* NOTE: OpenCV manipulations of frame query/set */
+	while(!endpos);	/* seem mthread-unfriendly */
+	while(runnable)
+	   if(!finish[t.id]){
+		if((cur=startpos+beg) < (cend=startpos+end<endpos?
+			   startpos+end:endpos)){
+		   for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur),
+			   frame2=cvQueryFrame(t.cap); cur<cend;
+			   ++cur,frame2=cvQueryFrame(t.cap))
+			if((reg.diffVal[cur-startpos]=reg.calcDiff(reg.frame1,frame2))
+				<1e-9F){
+			   finish.set(); break;
+			}
+		   for(cur=beg; cur<startpos+beg; ++cur)	// fill unused cells
+			reg.diffVal[cur]=std::numeric_limits<float>::max();
+		   for(cur=cend; cur<end; ++cur)
+			reg.diffVal[cur]=std::numeric_limits<float>::max();
+		}
+		finish.set(t.id);
+	   }
+   }
+   static void destruct_threads(ordered_thread& t){
+	if(t.t.joinable())t.t.join();
+	cvReleaseCapture(&t.cap);
+   }
+};
+bool mt::runnable;   // disabled
+
 myROI* frameRegister::roi;
 float frameRegister::heuristicSearchBound=.3;
 
 frameRegister::frameRegister(const char* cap_str[2], const int& prange, const
 	DiffMethod& me, const VideoDFT::Transform& tr, const Criterion& parm,
 	const int& nbin, const bool* drop, const bool normVec[2],const bool& inc,
-	const int& norm)throw(ErrMsg):diffParam(parm),
+	const int& norm)throw(ErrMsg):destFile(cap_str[1]),diffParam(parm),
    tr(tr),regpos(0),Method(me),count(0),prev_srcPos(0),nbins(nbin),dft1(0),dft2(0),
    hist(0),diffNorm(norm),dropArray(drop),norm1(normVec[0]),norm2(normVec[1]),
    inc(inc),src_cap(cvCreateFileCapture(cap_str[0])),nfr1(static_cast<unsigned>(
 		cvGetCaptureProperty(src_cap, CV_CAP_PROP_FRAME_COUNT))),
-   dest_cap(cvCreateFileCapture(cap_str[1])),nfr2(static_cast<unsigned>(
+   dest_cap(cvCreateFileCapture(destFile)),nfr2(static_cast<unsigned>(
 		cvGetCaptureProperty(dest_cap,CV_CAP_PROP_FRAME_COUNT))),
-   range(prange>0? prange : (nfr1>nfr2? nfr1:nfr2)), diffPos(new int[2*range+1]),
-   diffVal(new float[2*range+1]), frame1(cvQueryFrame(src_cap)),
-   frame2(cvQueryFrame(dest_cap)) {
+   range(prange>0?prange:(nfr1>nfr2? nfr1:nfr2)),diffPos(new int[2*range+1]),
+   diffVal(new float[2*range+1]),frame1(cvQueryFrame(src_cap)),
+   frame2(cvQueryFrame(dest_cap)),pmt(new mt(boost::ref(*this))){
    if(!(src_cap && dest_cap && frame1 && frame2)) {
 	if(!(src_cap && dest_cap))sprintf(msg,
 		"frameRegister::ctor: cannot open \"%s\"for capturing.\n",
@@ -383,6 +443,7 @@ frameRegister::frameRegister(const char* cap_str[2], const int& prange, const
 }
 
 frameRegister::~frameRegister() {
+   pmt->runnable=false;
    delete fse, delete hist;
    delete dft1, delete dft2;
    delete[] diffPos, delete[] diffVal;
@@ -393,28 +454,44 @@ const int frameRegister::reg(const int& pos, const int& prev_reg, const DiffMeth
 	me)throw(ErrMsg){
    if(pos >= nfr1)return -1;
    Method=me;
-   int startpos = pos>range?pos-range:0, endpos = pos+range<nfr2?pos+range:nfr2-1;
-   if(inc && startpos<=prev_reg)startpos=prev_reg+1;
-   if(endpos+range<nfr2 && startpos>endpos){
-	sprintf(msg,"frameRegister::reg: prev_reg starts from %d too large for searching"
-		" %d-th frame. Search range=[%d %d].\n Try increase search range (%d) .",
-		prev_reg, pos, startpos, endpos, range); throw ErrMsg(msg);
+   pmt->startpos = pos>range?pos-range:0;
+   pmt->endpos = pos+range<nfr2?pos+range:nfr2-1;
+   if(inc && pmt->startpos<=prev_reg)pmt->startpos=prev_reg+1;
+   if(pmt->endpos+range<nfr2 && pmt->startpos>pmt->endpos){
+	sprintf(msg,"frameRegister::reg: prev_reg starts from %d too large for "
+		"searching %d-th frame. Search range=[%d %d].\n Try increase search "
+		"range (%d) .", prev_reg, pos, pmt->startpos, pmt->endpos, range);
+	throw ErrMsg(msg);
    }
    if(dropArray){
-	for(int cnt=0; cnt<startpos; ++cnt)if(dropArray[cnt])--startpos, --endpos;
-	for(int cnt=startpos; cnt<endpos; ++cnt)if(dropArray[cnt])--endpos;
+	for(int cnt=0; cnt<pmt->startpos; ++cnt)if(dropArray[cnt])
+	   --pmt->startpos, --pmt->endpos;
+	for(int cnt=pmt->startpos; cnt<pmt->endpos; ++cnt)
+	   if(dropArray[cnt])--pmt->endpos;
    }
-   count = endpos-startpos+1;
+   count = pmt->endpos-pmt->startpos+1;
    memset(diffVal, 0, sizeof(float)*(range*2+1));
    memset(diffPos, 0, sizeof(int)*(range*2+1));
-   int src_startpos =static_cast<int>(cvGetCaptureProperty(src_cap, CV_CAP_PROP_POS_FRAMES));
-   cvSetCaptureProperty(src_cap, CV_CAP_PROP_POS_FRAMES, pos); frame1=cvQueryFrame(src_cap);
-   cvSetCaptureProperty(dest_cap, CV_CAP_PROP_POS_FRAMES, startpos); frame2=cvQueryFrame(dest_cap);
-   for(int cpos=startpos; cpos<=endpos; ++cpos) { /* frame-wise differences */
-	// short-cut only when 'inc' constraint not imposed
-	if(0==(diffVal[cpos-startpos] = calcDiff()) && !inc)return cpos+1;
-	diffPos[cpos-startpos] = cpos;
-	frame2=cvQueryFrame(dest_cap);
+   int src_startpos =static_cast<int>(cvGetCaptureProperty(src_cap,
+		CV_CAP_PROP_POS_FRAMES));
+   cvSetCaptureProperty(src_cap, CV_CAP_PROP_POS_FRAMES, pos);
+   frame1=cvQueryFrame(src_cap);
+   cvSetCaptureProperty(dest_cap, CV_CAP_PROP_POS_FRAMES, pmt->startpos);
+   frame2=cvQueryFrame(dest_cap);
+   if(!pmt->nThread)
+	for(int cpos=pmt->startpos; cpos<=pmt->endpos; ++cpos){
+	   // short-cut only when 'inc' constraint not imposed
+	   if(0==(diffVal[cpos-pmt->startpos] = calcDiff(frame1,frame2)) && !inc)
+		return cpos+1;
+	   diffPos[cpos-pmt->startpos] = cpos;
+	   frame2=cvQueryFrame(dest_cap);
+	}
+   else{
+	{
+	   boost::lock_guard<boost::mutex> lock(pmt->m);
+	   pmt->finish.clear();
+	}
+	while(pmt->finish.count()!=pmt->nThread);  // wait for all threads
    }
    prev_srcPos = pos;
    float diffSort[count];
@@ -424,17 +501,17 @@ const int frameRegister::reg(const int& pos, const int& prev_reg, const DiffMeth
    float threshold = diffSort[static_cast<int>(heuristicSearchBound*count)];
    if(!inc){	// both constraints use heuristic search bound
 	bool nextLeft=true; int lpos=pos, rpos=pos;
-	for(int cpos=pos; lpos>=startpos && rpos<=endpos; nextLeft=!nextLeft){
-	   if(diffVal[cpos-startpos]<=threshold){
+	for(int cpos=pos; lpos>=pmt->startpos&&rpos<=pmt->endpos; nextLeft=!nextLeft){
+	   if(diffVal[cpos-pmt->startpos]<=threshold){
 		regpos=cpos;break;
 	   }
-	   if(nextLeft && lpos>startpos)cpos=--lpos;
-	   else if(rpos<endpos)cpos=++rpos;
+	   if(nextLeft && lpos>pmt->startpos)cpos=--lpos;
+	   else if(rpos<pmt->endpos)cpos=++rpos;
 	}
    }else{	// search for leftmost occurrence of p-percential position
-	regpos=endpos;
-	for(int regtmp=startpos; regtmp<=endpos; ++regtmp)
-	   if(diffVal[regtmp-startpos]<=threshold && regtmp<regpos){
+	regpos=pmt->endpos;
+	for(int regtmp=pmt->startpos; regtmp<=pmt->endpos; ++regtmp)
+	   if(diffVal[regtmp-pmt->startpos]<=threshold && regtmp<regpos){
 		regpos=regtmp; break;
 	   }
    }
@@ -450,34 +527,24 @@ void frameRegister::dump()const {
    puts("++++++++frameRegister++++++++");
 }
 
-const float frameRegister::calcDiff()throw(ErrMsg) {
-   if(!(frame1 && frame2))
-	throw ErrMsg("frameRegister::calcDiff: frame ptr Null.");
-   fse->update();
-   IplImage ipImg; cv::Mat ipMat;
-   if(roi) {
-	ipImg = *(roi->getPolyMat()), ipMat = cv::Mat(&ipImg);
-	if(Method==HistDiff) hist->setMask(&ipMat);
-   }
-   IplImage *frm1 = const_cast<IplImage*>(fse->get(true)),
-		*frm2 = const_cast<IplImage*>(fse->get(false));
-   if(Method==HistDiff) {  // 0 gives perfect match
-	if(!hist)	hist = new Hist(fse, nbins, diffParam, false);
-	else		hist->update(frm1, frm2);
+float frameRegister::calcDiff(IplImage* frame1,IplImage* frame2)
+   throw(ErrMsg){	/* rewrite. w. Size equalizer & ROI ignored */
+   if(!(frame1 && frame2))throw
+	ErrMsg("frameRegister::calcDiff: frame ptr Null.");
+   if(Method==HistDiff){
+	hist->update(frame1,frame2);
 	arrayDiff<float, std::vector> adiff(hist->get(true), hist->get(false),
 		diffParam, norm1);
 	return static_cast<float>(adiff.diff());
    }else if(Method==DtDiff){
-	if(!dft1) {
-	   dft1 = new VideoDFT(frame1, tr, nbins, true);
-	   delete dft2; dft2 = new VideoDFT(frame2, tr, nbins, true);
-	} else dft2->update(), dft1->update();
+	dft2->update(), dft1->update();	//WRONG!!
 	arrayDiff<double, std::vector> adiff(dft1->getEnergyDist(),
 		dft2->getEnergyDist(), diffParam, norm2);
 	return static_cast<float>(adiff.diff());
    }
-   return calcImgDiff(frm1, frm2, roi?&ipImg:0, diffNorm);
+   return calcImgDiff(frame1, frame2, 0, diffNorm);
 }
+
 
 // ++++++++++++++++++++++++++++++++++++++++
 bool frameUpdater::rmAdjEq;
@@ -650,14 +717,6 @@ void VideoRegister::prepend(char*const suf, const int& np, const int& noiseType,
    int icodec = cvGetCaptureProperty(vp.cap, CV_CAP_PROP_FOURCC); CvVideoWriter* write;
 	char *p=reinterpret_cast<char*>(&icodec), codec[]={*p, *(p+1), *(p+2), *(p+3), 0};
 	printf("Warning: VideoRegister::save: original codec format \"%s\" not supported.\n", codec);
-/*	try{
-	   const char* nms[]={fname,appName};
-	   Encoder enc(nms, vp, icodec); return;
-	}catch(const ErrMsg& ex){
-	   printf("runtime error: %s\nFall back to \"%s\" codec option.\n", ex.what(), Codec);
-	   write = cvCreateVideoWriter(appName, CV_FOURCC(Codec[0],Codec[1],Codec[2],Codec[3]),
-		   vp.prop.fps, vp.prop.size, vp.prop.chan);
-	} */
 	write = cvCreateVideoWriter(appName, CV_FOURCC(Codec[0],Codec[1],Codec[2],Codec[3]),
 		vp.prop.fps, vp.prop.size, vp.prop.chan);
    IplImage* frame=np>0&&noiseType>0? cvCreateImage(vp.prop.size, vp.prop.depth, vp.prop.chan):0,

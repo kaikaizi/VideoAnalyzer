@@ -16,8 +16,6 @@
 */ 
 
 #include "encoder.hh"
-#include <boost/foreach.hpp>
-#define For BOOST_FOREACH
 extern bool verbose;
 
 void cvDisplay::operator()(){

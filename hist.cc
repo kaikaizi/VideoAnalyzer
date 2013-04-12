@@ -439,3 +439,7 @@ void check_exist(const char*fname){
 	fclose(fp);
    }
 }
+
+void join_thread(boost::thread& t){
+   if(t.joinable())t.join();
+}

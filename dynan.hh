@@ -134,13 +134,13 @@ protected:
 };
 
 class myROI;
-
+class mt;
 /**
 * @brief Find best-match frame of video #2 for a given frame
 * of video #1 within a search range. Affected by static
 * member function that sets ROI (defined in sketch.hh)
 */
-class frameRegister {
+class frameRegister:boost::noncopyable{
 public:
 // defaults to FrameDiff
    typedef enum{DefaultDiff, FrameDiff, HistDiff, DtDiff}DiffMethod;
@@ -200,6 +200,7 @@ public:
 	if(f>0 && f<1)heuristicSearchBound=f;
    }
 protected:
+   const char* destFile;
    CvCapture *src_cap, *dest_cap;
    IplImage *frame1, *frame2;
    frameSizeEq* fse;
@@ -215,8 +216,10 @@ protected:
    const VideoDFT::Transform tr;
    const Criterion diffParam;
    frameRegister(const frameRegister&);
-   const float calcDiff()throw(ErrMsg);
+   float calcDiff(IplImage*,IplImage*)throw(ErrMsg);
    static float heuristicSearchBound;
+   friend mt;
+   boost::scoped_ptr<mt> pmt;
 };
 
 /** @brief Resource manager (broker) for video pairs, so

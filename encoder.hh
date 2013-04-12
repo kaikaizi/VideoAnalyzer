@@ -16,7 +16,6 @@
 */ 
 #pragma once
 #include "hist.hh"
-#include <boost/thread.hpp>
 #include <boost/smart_ptr.hpp>
 extern "C"{
 #include <libavformat/avformat.h>
@@ -32,7 +31,7 @@ struct cvDisplay:boost::noncopyable{
    display(img,url,count),t(boost::ref(display)),vote(pts){}
    ~cvDisplay(){
 	if(write)cvReleaseVideoWriter(&write);
-	if(t.joinable())t.join();
+	join_thread(t);
    }
    void operator()();
 protected:
@@ -136,7 +135,7 @@ public: /* VideoDecoder must outlives this */
 	av_free(pic); av_free(picbgr); av_free(picture_buf);
 	sws_freeContext(img_context_ctx);
 	cvReleaseImageHeader(&img);
-	if(tp)tp->join();
+	join_thread(*tp);
 	av_free_packet(&packet);
    }
    void operator()(bool show,const char*,VideoCopier*);
