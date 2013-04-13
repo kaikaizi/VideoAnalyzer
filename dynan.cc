@@ -18,6 +18,7 @@
 #include <boost/dynamic_bitset.hpp>
 
 extern char msg[256];
+extern bool verbose;
 
 void swap(VideoProp&fst, VideoProp&snd){
    VideoProp tmp(fst); fst=snd; snd=tmp;
@@ -340,27 +341,26 @@ void frameSizeEq::update(const bool& first) {
 
 class mt:boost::noncopyable{
 public:
-   const static int minCalcPerThread=16;
-   const int nThread, nTask;
-   volatile int startpos, endpos;	/* writeable by frameRegister ONLY */
+   const static int minCalcPerThread=32;
+   const int nThread;
+   volatile int startpos, endpos;	/* RO to mt */
    typedef struct ordered_thread{
-	unsigned id;
+	int id;
 	boost::thread t;
 	CvCapture* cap;
-	ordered_thread(unsigned i,boost::thread t,CvCapture* c):
+	ordered_thread(int i,boost::thread t,CvCapture* c):
 	   id(i),t(boost::move(t)),cap(c){}
    }ordered_thread;
    boost::dynamic_bitset<> finish;
    boost::mutex m;
-   static bool runnable;
-   explicit mt(frameRegister& f):nThread((!runnable||f.range<=minCalcPerThread)?0:
-	   std::min<int>(f.range/minCalcPerThread,boost::thread::
-	   hardware_concurrency())),nTask(nThread?(f.range*2+1)/nThread:0),
-		startpos(0),endpos(0),finish(nThread),reg(f){
-	printf("%d threads\n",nThread);
-	for(unsigned id=0; id<nThread; ++id){
+   explicit mt(frameRegister& f):nThread((!frameRegister::runnable||
+		f.range<=minCalcPerThread)?0:std::min<int>(f.range/minCalcPerThread,
+		   boost::thread::hardware_concurrency())),nTask(0),startpos(0),
+		endpos(0),finish(nThread),reg(f){
+	if(::verbose) printf("%d threads launched\n",nThread);
+	for(int id=0; id<nThread; ++id){
 	   ordered_thread o(id,boost::thread(),cvCreateFileCapture(reg.destFile));
-	   o.t=boost::thread(boost::bind(&mt::run,this,boost::ref(o)));
+	   o.t=boost::thread(boost::bind(&mt::run,this,id));
 	   threads.push_back(boost::move(o));
 	}
    }
@@ -368,30 +368,51 @@ public:
 	std::for_each(threads.begin(),threads.end(),mt::destruct_threads);
    }
 protected:
+   int nTask;
    std::vector<ordered_thread> threads;
    frameRegister& reg;
-   void run(ordered_thread& t){
+   void run(int id){
+	while(!endpos);
+	ordered_thread& t=threads[id];
+	if(!nTask)nTask=(reg.range*2+1)/nThread;
 	const int beg=t.id*nTask, end=std::min<int>(reg.range*2+1,(t.id+1)*nTask-1);
 	IplImage* frame2;
-	int cur, cend;	/* NOTE: OpenCV manipulations of frame query/set */
-	while(!endpos);	/* seem mthread-unfriendly */
-	while(runnable)
+	int cur, cend;
+	while(frameRegister::runnable)
 	   if(!finish[t.id]){
-		if((cur=startpos+beg) < (cend=startpos+end<endpos?
-			   startpos+end:endpos)){
-		   for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur),
-			   frame2=cvQueryFrame(t.cap); cur<cend;
+		if((cur=startpos+beg)<(cend=startpos+end<endpos?startpos+end:endpos)){
+		   cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur);
+		   for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur), frame2=
+			   cvQueryFrame(t.cap);
+			   cur<=cend && !reg.diffVal[cur-startpos];
 			   ++cur,frame2=cvQueryFrame(t.cap))
 			if((reg.diffVal[cur-startpos]=reg.calcDiff(reg.frame1,frame2))
 				<1e-9F){
 			   finish.set(); break;
 			}
-		   for(cur=beg; cur<startpos+beg; ++cur)	// fill unused cells
-			reg.diffVal[cur]=std::numeric_limits<float>::max();
+		   for(cur=startpos+beg;
+			   cur < std::max<int>(reinterpret_cast<int>(startpos),beg);
+			   ++cur)reg.diffVal[cur]=std::numeric_limits<float>::max();
 		   for(cur=cend; cur<end; ++cur)
 			reg.diffVal[cur]=std::numeric_limits<float>::max();
 		}
 		finish.set(t.id);
+		int beg2, end2, calcs;	// coorperate other threads
+		for(int id2=0; id2<nThread; ++id2)	// work in reverse direction
+		   if(!finish[id2] && (cend=startpos+(beg2=id2*nTask))<(cur=startpos+
+				(end2=std::min<int>(reg.range*2+1,(id2+1)*nTask-1))
+			    <endpos?startpos+end2:endpos) && !reg.diffVal[cur]){
+			for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur),
+				frame2=cvQueryFrame(t.cap), calcs=0;
+				cur>=cend && !reg.diffVal[cur-startpos]; ++calcs,
+				cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,--cur))
+			   if((reg.diffVal[cur-startpos]=reg.calcDiff(reg.frame1,frame2))
+				   <1e-9F){
+				finish.set(); break;
+			   }
+			if(::verbose)
+			   printf("thread %d helps thread %d w. %d calcs\n",id,id2,calcs);
+		   }
 	   }
    }
    static void destruct_threads(ordered_thread& t){
@@ -399,11 +420,11 @@ protected:
 	cvReleaseCapture(&t.cap);
    }
 };
-bool mt::runnable;   // disabled
 
+volatile bool frameRegister::runnable;
 myROI* frameRegister::roi;
 float frameRegister::heuristicSearchBound=.3;
-
+// NOTE: Skip last 2 frames as they take longest to decode
 frameRegister::frameRegister(const char* cap_str[2], const int& prange, const
 	DiffMethod& me, const VideoDFT::Transform& tr, const Criterion& parm,
 	const int& nbin, const bool* drop, const bool normVec[2],const bool& inc,
@@ -411,9 +432,9 @@ frameRegister::frameRegister(const char* cap_str[2], const int& prange, const
    tr(tr),regpos(0),Method(me),count(0),prev_srcPos(0),nbins(nbin),dft1(0),dft2(0),
    hist(0),diffNorm(norm),dropArray(drop),norm1(normVec[0]),norm2(normVec[1]),
    inc(inc),src_cap(cvCreateFileCapture(cap_str[0])),nfr1(static_cast<unsigned>(
-		cvGetCaptureProperty(src_cap, CV_CAP_PROP_FRAME_COUNT))),
+		cvGetCaptureProperty(src_cap, CV_CAP_PROP_FRAME_COUNT))-2),
    dest_cap(cvCreateFileCapture(destFile)),nfr2(static_cast<unsigned>(
-		cvGetCaptureProperty(dest_cap,CV_CAP_PROP_FRAME_COUNT))),
+		cvGetCaptureProperty(dest_cap,CV_CAP_PROP_FRAME_COUNT))-2),
    range(prange>0?prange:(nfr1>nfr2? nfr1:nfr2)),diffPos(new int[2*range+1]),
    diffVal(new float[2*range+1]),frame1(cvQueryFrame(src_cap)),
    frame2(cvQueryFrame(dest_cap)),pmt(new mt(boost::ref(*this))){
@@ -443,7 +464,7 @@ frameRegister::frameRegister(const char* cap_str[2], const int& prange, const
 }
 
 frameRegister::~frameRegister() {
-   pmt->runnable=false;
+   runnable=false;
    delete fse, delete hist;
    delete dft1, delete dft2;
    delete[] diffPos, delete[] diffVal;
@@ -489,7 +510,7 @@ const int frameRegister::reg(const int& pos, const int& prev_reg, const DiffMeth
    else{
 	{
 	   boost::lock_guard<boost::mutex> lock(pmt->m);
-	   pmt->finish.clear();
+	   pmt->finish.reset();
 	}
 	while(pmt->finish.count()!=pmt->nThread);  // wait for all threads
    }

@@ -81,8 +81,7 @@ void simpStat<T>::update(){
 }
 
 template<typename T>void simpStat<T>::dump()const{
-   std::copy(copy.begin(), copy.end(), std::ostream_iterator<long double>
-	   (std::cout, " "));
+   print<long double,std::vector>(copy);
 }
 
 template<typename T>long double simpStat<T>::mean() {
@@ -192,10 +191,10 @@ template<typename T, template<typename,typename>class CONT>
 void arrayDiff<T,CONT>::dump()const {
    puts("\n------------arrayDiff------------");fflush(stdout);
    printf("Container #1(%u):\n", size);
-   std::copy(bin1.begin(), bin1.end(), std::ostream_iterator<T>(std::cout, " "));
+   print<T,std::vector>(bin1);
    std::cout<<"\nMean="<<mean[0]<<std::endl;
    puts("Container #2:");
-   std::copy(bin2.begin(), bin2.end(), std::ostream_iterator<T>(std::cout, " "));
+   print<T,std::vector>(bin2);
    std::cout<<"\nMean="<<mean[1]<<std::endl;
    puts("------------arrayDiff END------------");
 }

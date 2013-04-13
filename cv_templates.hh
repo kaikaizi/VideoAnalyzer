@@ -24,7 +24,14 @@
 
 #include <vector>
 #include "sketch.hh"
-#include "hist.hh"	// typedef Criterion
+#include "hist.hh"
+
+EXPORT template<typename T,template<class,class=std::allocator<T> >class CONT>
+void print(const CONT<T>& c){
+   std::copy(c.begin(),c.end(),std::ostream_iterator<T>
+	   (std::cout," "));
+   puts("");
+}
 
 /**
 * @brief Calculates simple statistics for a sequential

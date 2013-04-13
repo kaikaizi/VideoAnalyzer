@@ -442,6 +442,14 @@ mode. 'None' indicates no frames to be lost; 'drop' means drop certain frames ac
 ; 'freeze' means substitute all dropped frames by previous undropped frame; 'both' means 'freeze' certain dropped frames using the same 
 .I Frame-drop Simulation Settings
 settings.
+.RS
+.I Behavior.MThread
+.RE
+Boolean type. Experimental. Specifies whether to enable multithread to support frame registration. Only in effect when 
+.BI Constraint.FRused
+is true and 
+.BI Num.FRSearch
+is large enough (>30). ROI is not supported presently.
 
 .SH INTERACTION
 

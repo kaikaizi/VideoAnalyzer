@@ -19,8 +19,6 @@
 #include "cv_templates.hh"
 #pragma once
 
-extern char msg[256];
-extern bool verbose;
 /**
 * @brief Interpolate frame(s) among a set of frames. Used
 * for frame recovery when frame-drop is detected.
@@ -211,6 +209,7 @@ protected:
    float *diffVal;
    const bool* dropArray, norm1, norm2, inc;
    static myROI* roi;
+   volatile static bool runnable;
    const int diffNorm;
    DiffMethod Method;
    const VideoDFT::Transform tr;
@@ -219,6 +218,7 @@ protected:
    float calcDiff(IplImage*,IplImage*)throw(ErrMsg);
    static float heuristicSearchBound;
    friend mt;
+   friend class loadConf;
    boost::scoped_ptr<mt> pmt;
 };
 

@@ -21,7 +21,7 @@
 #include <iterator>
 #include <boost/foreach.hpp>
 #define For BOOST_FOREACH
-
+extern bool verbose;
 void dashLine(cv::Mat& mat, const cv::Point& from, const cv::Point& to) {
    cv::LineIterator iter(mat, from, to);
    const int dashLen=10, dashGap=3, dashTotal=dashLen+dashGap;
@@ -466,8 +466,7 @@ void Filter1D::set()throw(ErrMsg){
 
 void Filter1D::dump()const{
    puts("==========Filter1D Coefs:==========");
-   std::copy(coefs.begin(), coefs.end(), std::ostream_iterator<float>(std::cout,
-		" "));
+   print<float,std::vector>(coefs);
    puts("\n====================");
 }
 
@@ -602,8 +601,7 @@ void VideoDFT::update() {
 void VideoDFT::dump()const {
    puts("==========VideoDFT Data:==========");
    std::cout<<std::setprecision(4);
-   std::copy(energyDist.begin(), energyDist.end(),
-	   std::ostream_iterator<double>(std::cout," "));
+   print<double,std::vector>(energyDist);
    putchar('\n');
 }
 
