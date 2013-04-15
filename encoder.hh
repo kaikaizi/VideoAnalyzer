@@ -49,14 +49,14 @@ protected:
    /* ugly hack for avcodec pts: frame drops */
    template<typename value_type>struct Voter:boost::noncopyable{
 	explicit Voter(volatile const value_type*pts):pts(pts),winner(0),
-	prev(0),key(0),age(0){}
+	prev(0),key(0),age(0),prevFrames(0){}
 	int operator()();
    protected:
 	volatile const value_type* pts;
 	value_type winner,prev,key;   /* currently determined pts */
 	std::vector<value_type> Keys;
-	int age;
-	const static int timeout=8, max_delay_frame=90;
+	int age, prevFrames;
+	const static int timeout=8, max_delay_frame=60;
    };
    Voter<value_type> vote;
 };

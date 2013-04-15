@@ -206,6 +206,7 @@ protected:
    VideoDFT *dft1, *dft2;
    unsigned nfr1, nfr2, regpos, count;
    int nbins, range, prev_srcPos, *diffPos;
+   volatile int startpos, endpos;
    float *diffVal;
    const bool* dropArray, norm1, norm2, inc;
    static myROI* roi;
@@ -217,6 +218,7 @@ protected:
    frameRegister(const frameRegister&);
    float calcDiff(IplImage*,IplImage*)throw(ErrMsg);
    static float heuristicSearchBound;
+   const static float epsilon;
    friend mt;
    friend class loadConf;
    boost::scoped_ptr<mt> pmt;

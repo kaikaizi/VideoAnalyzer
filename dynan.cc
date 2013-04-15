@@ -341,89 +341,93 @@ void frameSizeEq::update(const bool& first) {
 
 class mt:boost::noncopyable{
 public:
-   const static int minCalcPerThread=32;
-   const int nThread;
-   volatile int startpos, endpos;	/* RO to mt */
-   typedef struct ordered_thread{
-	int id;
-	boost::thread t;
-	CvCapture* cap;
-	ordered_thread(int i,boost::thread t,CvCapture* c):
-	   id(i),t(boost::move(t)),cap(c){}
-   }ordered_thread;
-   boost::dynamic_bitset<> finish;
-   boost::mutex m;
-   explicit mt(frameRegister& f):nThread((!frameRegister::runnable||
-		f.range<=minCalcPerThread)?0:std::min<int>(f.range/minCalcPerThread,
-		   boost::thread::hardware_concurrency())),nTask(0),startpos(0),
-		endpos(0),finish(nThread),reg(f){
-	if(::verbose) printf("%d threads launched\n",nThread);
-	for(int id=0; id<nThread; ++id){
-	   ordered_thread o(id,boost::thread(),cvCreateFileCapture(reg.destFile));
-	   o.t=boost::thread(boost::bind(&mt::run,this,id));
-	   threads.push_back(boost::move(o));
-	}
+   explicit mt(frameRegister& f):reg(f),range(2*reg.range+1),nThread(
+	   (!frameRegister::runnable||range<=minCalcPerThread)?0:std::min<int>
+	   (range/minCalcPerThread,boost::thread::hardware_concurrency())),
+		nTask(1+range/nThread),finish(nThread){
+	if(nThread){
+	   if(::verbose)
+		printf("%d threads launched\n",nThread);
+	   for(int id=0; id<nThread; ++id)
+		threads.push_back(ordered_thread(id, id*nTask,
+			   std::min(range,(id+1)*nTask-1),
+			boost::thread(boost::bind(&mt::run,this,id)),
+			cvCreateFileCapture(reg.destFile)));
+	}else frameRegister::runnable=false;
    }
    ~mt(){
-	std::for_each(threads.begin(),threads.end(),mt::destruct_threads);
+	std::for_each(threads.begin(),threads.end(),mt::destruct);
+   }
+   bool idle()const{	/* test all threads are idle */
+	return finish.count()==nThread;
+   }
+   void reset(){
+	finish.reset();
    }
 protected:
-   int nTask;
-   std::vector<ordered_thread> threads;
+   const static int minCalcPerThread=32;
    frameRegister& reg;
-   void run(int id){
-	while(!endpos);
-	ordered_thread& t=threads[id];
-	if(!nTask)nTask=(reg.range*2+1)/nThread;
-	const int beg=t.id*nTask, end=std::min<int>(reg.range*2+1,(t.id+1)*nTask-1);
-	IplImage* frame2;
-	int cur, cend;
-	while(frameRegister::runnable)
-	   if(!finish[t.id]){
-		if((cur=startpos+beg)<(cend=startpos+end<endpos?startpos+end:endpos)){
-		   cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur);
-		   for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur), frame2=
-			   cvQueryFrame(t.cap);
-			   cur<=cend && !reg.diffVal[cur-startpos];
-			   ++cur,frame2=cvQueryFrame(t.cap))
-			if((reg.diffVal[cur-startpos]=reg.calcDiff(reg.frame1,frame2))
-				<1e-9F){
-			   finish.set(); break;
-			}
-		   for(cur=startpos+beg;
-			   cur < std::max<int>(reinterpret_cast<int>(startpos),beg);
-			   ++cur)reg.diffVal[cur]=std::numeric_limits<float>::max();
-		   for(cur=cend; cur<end; ++cur)
-			reg.diffVal[cur]=std::numeric_limits<float>::max();
-		}
-		finish.set(t.id);
-		int beg2, end2, calcs;	// coorperate other threads
-		for(int id2=0; id2<nThread; ++id2)	// work in reverse direction
-		   if(!finish[id2] && (cend=startpos+(beg2=id2*nTask))<(cur=startpos+
-				(end2=std::min<int>(reg.range*2+1,(id2+1)*nTask-1))
-			    <endpos?startpos+end2:endpos) && !reg.diffVal[cur]){
-			for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur),
-				frame2=cvQueryFrame(t.cap), calcs=0;
-				cur>=cend && !reg.diffVal[cur-startpos]; ++calcs,
-				cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,--cur))
-			   if((reg.diffVal[cur-startpos]=reg.calcDiff(reg.frame1,frame2))
-				   <1e-9F){
-				finish.set(); break;
-			   }
-			if(::verbose)
-			   printf("thread %d helps thread %d w. %d calcs\n",id,id2,calcs);
-		   }
-	   }
-   }
-   static void destruct_threads(ordered_thread& t){
+   const int range, nThread, nTask;
+   struct ordered_thread{
+	const int id, beg, end;
+	boost::thread t;
+	CvCapture* cap;
+	ordered_thread(int i, int b, int e,boost::thread t,CvCapture*c):
+	   id(i),beg(b),end(e),t(boost::move(t)),cap(c){}
+   };
+   std::vector<ordered_thread> threads;
+   boost::dynamic_bitset<> finish;
+   static void destruct(ordered_thread& t){
 	if(t.t.joinable())t.t.join();
 	cvReleaseCapture(&t.cap);
    }
+   void run(const int);
 };
+
+void mt::run(const int id){	/* dispatched immediately */
+   const ordered_thread& t=threads[id];
+   int cur, end, calcs;
+   while(!reg.endpos);
+   while(frameRegister::runnable)
+	if(!finish[id]){
+	   if((cur=reg.startpos+t.beg)<(end=reg.startpos+t.end<reg.endpos?
+			reg.startpos+t.end:reg.endpos)){
+		for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur);
+			cur<=end && !reg.diffVal[cur-reg.startpos]; ++cur);
+		if((reg.diffVal[cur-reg.startpos]=reg.calcDiff(reg.frame1,
+				cvQueryFrame(t.cap)))<frameRegister::epsilon){
+		   finish.set(); break;
+		}
+		for(cur=reg.startpos+t.beg; cur < std::max(reinterpret_cast<int>
+			   (reg.startpos),t.beg); ++cur)
+		   reg.diffVal[cur]=std::numeric_limits<float>::max();
+		for(cur=end; cur<t.end; ++cur)
+		   reg.diffVal[cur]=std::numeric_limits<float>::max();
+	   }
+	   finish.set(id);continue;
+	   if(!idle())
+		For(ordered_thread& t2,threads){
+		   if(!finish[t2.id] && (end=reg.startpos+t2.beg)<	// work backwards
+			   (cur=reg.startpos+t2.end<reg.endpos?reg.startpos+
+			    t2.end:reg.endpos) && !reg.diffVal[cur]){
+			for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur),calcs=0;
+				cur>=end && !reg.diffVal[cur-reg.startpos]; ++calcs,
+				cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,--cur))
+			   if((reg.diffVal[cur-reg.startpos]=reg.calcDiff(reg.frame1,
+				   cvQueryFrame(t.cap)))<frameRegister::epsilon){
+				finish.set(); break;
+			   }
+			if(::verbose)printf("thread %d helps thread %d w. %d calcs\n",
+				id,t2.id,calcs);
+		   }
+		}
+	}
+}
 
 volatile bool frameRegister::runnable;
 myROI* frameRegister::roi;
 float frameRegister::heuristicSearchBound=.3;
+const float frameRegister::epsilon=1e-9F;
 // NOTE: Skip last 2 frames as they take longest to decode
 frameRegister::frameRegister(const char* cap_str[2], const int& prange, const
 	DiffMethod& me, const VideoDFT::Transform& tr, const Criterion& parm,
@@ -436,8 +440,8 @@ frameRegister::frameRegister(const char* cap_str[2], const int& prange, const
    dest_cap(cvCreateFileCapture(destFile)),nfr2(static_cast<unsigned>(
 		cvGetCaptureProperty(dest_cap,CV_CAP_PROP_FRAME_COUNT))-2),
    range(prange>0?prange:(nfr1>nfr2? nfr1:nfr2)),diffPos(new int[2*range+1]),
-   diffVal(new float[2*range+1]),frame1(cvQueryFrame(src_cap)),
-   frame2(cvQueryFrame(dest_cap)),pmt(new mt(boost::ref(*this))){
+   diffVal(new float[2*range+1]),endpos(0),frame1(cvQueryFrame(src_cap)),
+   frame2(cvQueryFrame(dest_cap)),pmt(new mt(*this)){	/* defer computational threads */
    if(!(src_cap && dest_cap && frame1 && frame2)) {
 	if(!(src_cap && dest_cap))sprintf(msg,
 		"frameRegister::ctor: cannot open \"%s\"for capturing.\n",
@@ -475,44 +479,38 @@ const int frameRegister::reg(const int& pos, const int& prev_reg, const DiffMeth
 	me)throw(ErrMsg){
    if(pos >= nfr1)return -1;
    Method=me;
-   pmt->startpos = pos>range?pos-range:0;
-   pmt->endpos = pos+range<nfr2?pos+range:nfr2-1;
-   if(inc && pmt->startpos<=prev_reg)pmt->startpos=prev_reg+1;
-   if(pmt->endpos+range<nfr2 && pmt->startpos>pmt->endpos){
+   startpos = pos>range?pos-range:0;
+   endpos = pos+range<nfr2?pos+range:nfr2-1;
+   if(inc && startpos<=prev_reg)startpos=prev_reg+1;
+   if(endpos+range<nfr2 && startpos>endpos){
 	sprintf(msg,"frameRegister::reg: prev_reg starts from %d too large for "
 		"searching %d-th frame. Search range=[%d %d].\n Try increase search "
-		"range (%d) .", prev_reg, pos, pmt->startpos, pmt->endpos, range);
+		"range (%d) .", prev_reg, pos, startpos, endpos, range);
 	throw ErrMsg(msg);
    }
    if(dropArray){
-	for(int cnt=0; cnt<pmt->startpos; ++cnt)if(dropArray[cnt])
-	   --pmt->startpos, --pmt->endpos;
-	for(int cnt=pmt->startpos; cnt<pmt->endpos; ++cnt)
-	   if(dropArray[cnt])--pmt->endpos;
+	for(int cnt=0; cnt<startpos; ++cnt)if(dropArray[cnt])
+	   --startpos, --endpos;
+	for(int cnt=startpos; cnt<endpos; ++cnt)
+	   if(dropArray[cnt])--endpos;
    }
-   count = pmt->endpos-pmt->startpos+1;
+   count = endpos-startpos+1;
    memset(diffVal, 0, sizeof(float)*(range*2+1));
    memset(diffPos, 0, sizeof(int)*(range*2+1));
    int src_startpos =static_cast<int>(cvGetCaptureProperty(src_cap,
 		CV_CAP_PROP_POS_FRAMES));
    cvSetCaptureProperty(src_cap, CV_CAP_PROP_POS_FRAMES, pos);
    frame1=cvQueryFrame(src_cap);
-   cvSetCaptureProperty(dest_cap, CV_CAP_PROP_POS_FRAMES, pmt->startpos);
-   frame2=cvQueryFrame(dest_cap);
-   if(!pmt->nThread)
-	for(int cpos=pmt->startpos; cpos<=pmt->endpos; ++cpos){
-	   // short-cut only when 'inc' constraint not imposed
-	   if(0==(diffVal[cpos-pmt->startpos] = calcDiff(frame1,frame2)) && !inc)
-		return cpos+1;
-	   diffPos[cpos-pmt->startpos] = cpos;
-	   frame2=cvQueryFrame(dest_cap);
-	}
-   else{
-	{
-	   boost::lock_guard<boost::mutex> lock(pmt->m);
-	   pmt->finish.reset();
-	}
-	while(pmt->finish.count()!=pmt->nThread);  // wait for all threads
+   if(runnable){
+	pmt->reset();
+	while(!pmt->idle());  // wait for all threads
+   }else for(int cpos=startpos; cpos<=endpos; ++cpos){
+	cvSetCaptureProperty(dest_cap, CV_CAP_PROP_POS_FRAMES, startpos);
+	frame2=cvQueryFrame(dest_cap);
+	if((diffVal[cpos-startpos] = calcDiff(frame1,frame2))<epsilon && !inc)
+	   return cpos+1;
+	diffPos[cpos-startpos] = cpos;
+	frame2=cvQueryFrame(dest_cap);
    }
    prev_srcPos = pos;
    float diffSort[count];
@@ -522,17 +520,17 @@ const int frameRegister::reg(const int& pos, const int& prev_reg, const DiffMeth
    float threshold = diffSort[static_cast<int>(heuristicSearchBound*count)];
    if(!inc){	// both constraints use heuristic search bound
 	bool nextLeft=true; int lpos=pos, rpos=pos;
-	for(int cpos=pos; lpos>=pmt->startpos&&rpos<=pmt->endpos; nextLeft=!nextLeft){
-	   if(diffVal[cpos-pmt->startpos]<=threshold){
+	for(int cpos=pos; lpos>=startpos&&rpos<=endpos; nextLeft=!nextLeft){
+	   if(diffVal[cpos-startpos]<=threshold){
 		regpos=cpos;break;
 	   }
-	   if(nextLeft && lpos>pmt->startpos)cpos=--lpos;
-	   else if(rpos<pmt->endpos)cpos=++rpos;
+	   if(nextLeft && lpos>startpos)cpos=--lpos;
+	   else if(rpos<endpos)cpos=++rpos;
 	}
    }else{	// search for leftmost occurrence of p-percential position
-	regpos=pmt->endpos;
-	for(int regtmp=pmt->startpos; regtmp<=pmt->endpos; ++regtmp)
-	   if(diffVal[regtmp-pmt->startpos]<=threshold && regtmp<regpos){
+	regpos=endpos;
+	for(int regtmp=startpos; regtmp<=endpos; ++regtmp)
+	   if(diffVal[regtmp-startpos]<=threshold && regtmp<regpos){
 		regpos=regtmp; break;
 	   }
    }

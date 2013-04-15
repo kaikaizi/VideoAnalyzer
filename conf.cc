@@ -401,7 +401,7 @@ int cv_getopt(int argc, char* argv[], char* optargs[5], int16_t& status){
 	switch(c){
 	   case 0:
 		if(opt_flag=*long_options[option_index].flag && (status|=opt_flag)&2)
-		   return rtsp_client(optarg,argv[optind]);
+		   return rtsp_client(optarg,argc-optind==1?argv[optind]:"-");
 	   case 'C':
 		strcpy(confname, optarg); status |= 0x2; break;
 	   case 'g': status |= 0x4; break;

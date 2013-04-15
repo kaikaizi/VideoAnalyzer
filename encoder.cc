@@ -21,7 +21,7 @@ extern bool verbose;
 void cvDisplay::operator()(){
    while(*display.count)
 	if(cnt!=*display.count&&(cnt=*display.count)&&write)
-	   for(int indx=vote(); indx; --indx)
+	   for(int indx=vote(); indx>0; --indx)
 		cvWriteFrame(write,display.image);
 }
 void cvDisplay::Display::operator()()const{
@@ -45,8 +45,10 @@ int cvDisplay::Voter<T>::operator()(){
 	age=0;
 	winner=*std::min_element(Keys.begin(),Keys.end());
    }
-   return std::min(max_delay_frame,
+   int cur=std::min(max_delay_frame,
 	   static_cast<int>(round((ckey+0.)/winner)));
+   return cur==max_delay_frame && prevFrames==max_delay_frame ?
+	0 : prevFrames=cur;
 }
 
 bool RtpDecoder::has_init;

@@ -25,6 +25,21 @@ export
 #include <algorithm>
 extern char msg[256];
 
+template<typename T>
+struct identity{
+   T&& operator()(const T&& v){
+	return boost::forward<T>(v);
+   }
+};
+
+template<typename T,template<class,class=std::allocator<T> >class
+CONT=std::vector, typename Tr=identity<T> >
+void print(const CONT<T>& c){
+   std::transform(c.begin(), c.end(),
+	   std::ostream_iterator<T>(std::cout," "), Tr());
+   putchar('\n');
+}
+
 template<typename T> 
 struct isNan{
    const bool operator()(const T&val){return val!=val;}
@@ -81,7 +96,7 @@ void simpStat<T>::update(){
 }
 
 template<typename T>void simpStat<T>::dump()const{
-   print<long double,std::vector>(copy);
+   print<long double>(copy);
 }
 
 template<typename T>long double simpStat<T>::mean() {
@@ -191,10 +206,10 @@ template<typename T, template<typename,typename>class CONT>
 void arrayDiff<T,CONT>::dump()const {
    puts("\n------------arrayDiff------------");fflush(stdout);
    printf("Container #1(%u):\n", size);
-   print<T,std::vector>(bin1);
+   print<T>(bin1);
    std::cout<<"\nMean="<<mean[0]<<std::endl;
    puts("Container #2:");
-   print<T,std::vector>(bin2);
+   print<T>(bin2);
    std::cout<<"\nMean="<<mean[1]<<std::endl;
    puts("------------arrayDiff END------------");
 }
