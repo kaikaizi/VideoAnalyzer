@@ -374,7 +374,7 @@ void help(const char* progname){
 	   "\"reference\" and save registered video to a new file.");
    puts("-v/--verbose: prints more information in processing");
    puts("--simulate: simulates frame dropping as the secondary video.");
-   puts("--as-client: work as RTSP client to display/save streamed video.\n"
+   puts("--as-client: work as RTSP client to display/save streamed video. "
 	   "Use - to suppress video saving.");
 }
 
@@ -463,10 +463,10 @@ void summaryPlot(const int& x_max, const Logger& log, const bool Plot){
    float ymax=0, p75;
    const char* category[]={"Dynamics #1","Dynamics #2","Difference","Hist_Corr",
 	"Hist_Chisq","Hist_Inter","Hist_Bhatt","DT_Corr","DT_Inter", "DT_Bhatt"};
-   fputs("\nSimple stats:\tMean\tSd\tMedia\t25 Perc\t 75 Perc\n", log.file.fd);
+   fputs("\n# Simple stats:\tMean\tSd\tMedia\t25 Perc\t 75 Perc\n", log.file.fd);
    for(int indx=0; indx<LogSize; ++indx){
 	if(ymax<(p75=ss[indx].perc(.75)))ymax=p75;
-	fprintf(log.file.fd, "%s: %Lf\t%Lf\t%Lf\t%Lf\t%f\n", category[indx], ss[indx].mean(),
+	fprintf(log.file.fd, "# %s: %Lf\t%Lf\t%Lf\t%Lf\t%f\n", category[indx], ss[indx].mean(),
 		ss[indx].sd(), ss[indx].perc(.5), ss[indx].perc(.25), p75);
    }
    if(!Plot)return;
@@ -646,8 +646,8 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
    }
    cvSetCaptureProperty(cap_sec,CV_CAP_PROP_POS_FRAMES, status&0x100?atoi(diff_n):1);
    VideoProp vp_sec(cap_sec), *pvp[]={&vp_main, &vp_sec};
-   printf("\"%s\" has %d frames, \"%s\" has %d frames.\n", names[0],
-	   vp_main.prop.fcount, names[1], vp_sec.prop.fcount);
+   printf("# \"%s\" has %d frames, \"%s\" has %d frames.\n", names[0], /* commented to convenience */
+	   vp_main.prop.fcount, names[1], vp_sec.prop.fcount);   /* table loading from R */
    if(status&0x10)swap(vp_main, vp_sec);	// register
    // frame-drop simulation
    simDropFrame *psdf=status&0x1 ? new simDropFrame(vp_main.prop.fcount, conf_float[0],
@@ -747,14 +747,14 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 	   }
 	   else up.update(false);
 	}
-	printf("%s: %d/%d/%d frame dropped/duplicated.\n", names[1],
+	printf("# %s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));
 	summaryPlot(vp_main.prop.fcount, *logs, roi);
 	delete psdf; delete pfr; delete roi; delete vcs;
 	cvReleaseCapture(&cap_main); cvReleaseCapture(&cap_sec);
    }catch(const ErrMsg& err){
 	if(err.errnos()==1){
-	   printf("%s: %d/%d/%d frame dropped/duplicated.\n", names[1],
+	   printf("# %s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		   frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));
 	   summaryPlot(vp_main.prop.fcount, *logs, roi);
 	}

@@ -466,7 +466,7 @@ void Filter1D::set()throw(ErrMsg){
 
 void Filter1D::dump()const{
    puts("==========Filter1D Coefs:==========");
-   print<float>(coefs);
+   print<float,std::vector>(coefs);
    puts("\n====================");
 }
 
@@ -601,7 +601,7 @@ void VideoDFT::update() {
 void VideoDFT::dump()const {
    puts("==========VideoDFT Data:==========");
    std::cout<<std::setprecision(4);
-   print<double>(energyDist);
+   print<double,std::vector>(energyDist);
    putchar('\n');
 }
 

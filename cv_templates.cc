@@ -25,19 +25,11 @@ export
 #include <algorithm>
 extern char msg[256];
 
-template<typename T>
-struct identity{
-   T&& operator()(const T&& v){
-	return boost::forward<T>(v);
-   }
-};
-
-template<typename T,template<class,class=std::allocator<T> >class
-CONT=std::vector, typename Tr=identity<T> >
+EXPORT template<typename T,template<class,class=std::allocator<T> >class CONT>
 void print(const CONT<T>& c){
-   std::transform(c.begin(), c.end(),
-	   std::ostream_iterator<T>(std::cout," "), Tr());
-   putchar('\n');
+   std::copy(c.begin(),c.end(),std::ostream_iterator<T>
+	   (std::cout," "));
+   puts("");
 }
 
 template<typename T> 
@@ -96,7 +88,7 @@ void simpStat<T>::update(){
 }
 
 template<typename T>void simpStat<T>::dump()const{
-   print<long double>(copy);
+   print<long double,std::vector>(copy);
 }
 
 template<typename T>long double simpStat<T>::mean() {
@@ -206,10 +198,10 @@ template<typename T, template<typename,typename>class CONT>
 void arrayDiff<T,CONT>::dump()const {
    puts("\n------------arrayDiff------------");fflush(stdout);
    printf("Container #1(%u):\n", size);
-   print<T>(bin1);
+   print<T,std::vector>(bin1);
    std::cout<<"\nMean="<<mean[0]<<std::endl;
    puts("Container #2:");
-   print<T>(bin2);
+   print<T,std::vector>(bin2);
    std::cout<<"\nMean="<<mean[1]<<std::endl;
    puts("------------arrayDiff END------------");
 }
