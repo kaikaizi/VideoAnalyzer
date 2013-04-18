@@ -706,7 +706,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
    try{
 	while(!frmUper.eof() && !Esc) {
 	   if(pfr)cvSetCaptureProperty(cap_sec, CV_CAP_PROP_POS_FRAMES, pos2=pfr->reg
-		   (vp_main.prop.posFrame, pos2));
+		   (vp_main.prop.posFrame, pos2)-1);
 	   else{
 		up2=false;
 		while(dropSeq && dropSeq[vp_main.prop.posFrame])++vp_sec.prop.posFrame, up2=true;
@@ -734,8 +734,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 			case VideoCtrlStream::ESC:
 			case VideoCtrlStream::Quit: break;
 			case VideoCtrlStream::SPACE:
-			case VideoCtrlStream::NUL:
-							    up.update(!vcs->getFrameDelay());
+			case VideoCtrlStream::NUL: up.update(!vcs->getFrameDelay());
 			    if(vcs->getFrameDelay()){
 				 vcs->update(vp_main.prop.posFrame, vp_sec.prop.posFrame);
 				 cvShowImage(video_str[0], fse.get(true));
@@ -744,8 +743,7 @@ void cv_procOpt(char*const* optargs, const int16_t& status)throw(ErrMsg,cv::Exce
 			default:;
 		   }
 		}while(!vcs->getFrameDelay());
-	   }
-	   else up.update(false);
+	   }else up.update(false);
 	}
 	printf("# %s: %d/%d/%d frame dropped/duplicated.\n", names[1],
 		frmUper.getNdrop(1), frmUper.getNdrop(2), frmUper.getNdrop(0));

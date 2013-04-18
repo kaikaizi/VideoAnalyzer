@@ -342,27 +342,27 @@ void frameSizeEq::update(const bool& first) {
 class mt:boost::noncopyable{
 public:
    explicit mt(frameRegister& f):reg(f),range(2*reg.range+1),nThread(
-	   (!frameRegister::runnable||range<=minCalcPerThread)?0:std::min<int>
-	   (range/minCalcPerThread,boost::thread::hardware_concurrency())),
-		nTask(nThread?1+range/nThread:0),unfinished(nThread),sc(-1){
+	   (!frameRegister::runnable||range<=minCalcPerThread)?0:std::max(0,
+		std::min<int>(range/minCalcPerThread,boost::thread::
+		   hardware_concurrency())-1)),nTask(1+range/(1+nThread)),
+		unfinished(nThread),sc(-1),master_beg(nThread*nTask){
 	unfinished.set();
 	if(nThread){
-	   if(::verbose)
-		printf("%d threads launched\n",nThread);
-	   for(int id=0; id<nThread; ++id)
-		threads.push_back(ordered_thread(id, id*nTask,
-			   std::min(range,(id+1)*nTask-1),
+	   if(::verbose)printf("%d slave threads launched\n",nThread);
+	   for(int id=0; id<nThread; ++id)	/* master thread: highest id */
+		threads.push_back(ordered_thread(reg, id, id*nTask, (id+1)*nTask-1,
 			   boost::thread(boost::bind(&mt::run,this,id)),
 			   cvCreateFileCapture(reg.destFile)));
 	}else frameRegister::runnable=false;
    }
    ~mt(){std::for_each(threads.begin(),threads.end(),mt::destruct);}
-   bool idle()const{return unfinished.none();}
+   bool busy()const{return unfinished.any();}
    void dispatch(){
 	boost::lock_guard<boost::mutex> l(m);
 	sc=-1; unfinished.set();
    }
-   volatile int get_sc()const{return sc;}
+   volatile int& get_sc(){return sc;}
+   int mbeg()const{return master_beg;}
 protected:
    const static int minCalcPerThread=32;
    frameRegister& reg;
@@ -372,10 +372,14 @@ protected:
 	const int id, beg, end;
 	boost::thread t;
 	CvCapture* cap;
-	ordered_thread(int i,int b,int e,boost::thread t,CvCapture* c):
-	   id(i),beg(b),end(e),t(boost::move(t)),cap(c){}
+	frameRegister& reg;
+	float* val; int* pos;
+	ordered_thread(frameRegister& reg, int i,int b,int e,boost::thread t,CvCapture* c):
+	   reg(reg),id(i),beg(b),end(e),t(boost::move(t)),cap(c),val(reg.diffVal+beg),
+	   pos(reg.diffPos+beg){}
    };
    std::vector<ordered_thread> threads;
+   const int master_beg;
    volatile int sc;
    boost::mutex m;
    void run(const int);
@@ -385,63 +389,36 @@ protected:
    }
    void shortcut(int cur){
 	boost::lock_guard<boost::mutex> l(m);
-	sc=cur-reg.startpos; unfinished.reset();
+	sc=cur; unfinished.reset();
    }
 };
 void mt::run(const int id){
    while(!reg.endpos);
-   const ordered_thread& t=threads[id];
+   ordered_thread& t=threads[id];
    int cur, end, calcs;
    while(frameRegister::runnable)
 	if(unfinished[t.id]){
-	   if((cur=reg.startpos+t.beg)<(end=(reg.startpos+t.end<reg.endpos?
-			   reg.startpos+t.end:reg.endpos))){
-		for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur);
-			sc==-1 && cur<=end && !reg.diffVal[cur-reg.startpos];
-			++cur){
-		   reg.diffPos[cur-reg.startpos]=cur;
-		   if((reg.diffVal[cur-reg.startpos]=reg.calcDiff(reg.frame1,
+	   if((cur=reg.startpos+t.beg)<(end=std::min(reg.startpos+t.end,
+			   reinterpret_cast<int>(reg.endpos)))){
+		for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur),calcs=0;
+			sc==-1 && cur<=end; ++cur,++calcs){
+		   t.pos[calcs]=cur;
+		   if((t.val[calcs]=reg.calcDiff(reg.frame1,
 				   cvQueryFrame(t.cap)))<frameRegister::epsilon && !reg.inc){
-			shortcut(cur); break;
+			shortcut(cur-reg.startpos); break;
 		   }
 		}
-		if(sc==-1){
-		   for(calcs=reg.startpos+t.beg;
-			   calcs < std::max(reinterpret_cast<int>(reg.startpos),t.beg);
-			   ++calcs)reg.diffVal[calcs]=std::numeric_limits<float>::max();
-		   for(calcs=end; calcs<t.end; ++calcs)
-			reg.diffVal[calcs]=std::numeric_limits<float>::max();
-		}
-	   }
-	   unfinished.reset(t.id);	// work in reverse direction
-	   if(cur<end)For(const ordered_thread& t2,threads){
-		if(unfinished[t2.id] && (end=reg.startpos+t2.beg)<
-			(cur=(reg.startpos+t2.end<reg.endpos?reg.startpos+t2.end:
-				reg.endpos)) && !reg.diffVal[cur]){
-		   for(cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,cur), calcs=0;
-			   sc==-1 && cur>=end && !reg.diffVal[cur-reg.startpos]; ++calcs,
-			   cvSetCaptureProperty(t.cap,CV_CAP_PROP_POS_FRAMES,--cur-1)){
-			reg.diffPos[cur-reg.startpos]=cur;
-			if((reg.diffVal[cur-reg.startpos]=reg.calcDiff(reg.frame1,
-					cvQueryFrame(t.cap)))<frameRegister::epsilon &&
-				!reg.inc){
-			   shortcut(cur); break;
-			}
-		   }
-		   if(::verbose && calcs)
-			printf("thread %d helps thread %d w. %d calcs\n",id,t2.id,calcs);
-		}
-		if(!idle())break;
-	   }
-// 	   printf("%d:%d yields: %lu\n",reg.startpos,t.id,unfinished.to_ulong());
-	   // TODO: dreaded deadlock??
-// 	   assert(!unfinished[t.id]);
+		for(calcs=nTask-1; calcs>end-t.beg-reg.startpos; --calcs)
+		   t.val[calcs]=std::numeric_limits<float>::max();
+	   }else for(calcs=0; calcs<nTask; ++calcs)
+		t.val[calcs]=std::numeric_limits<float>::max();
+	   unfinished.reset(t.id);
 	}
 }
 volatile bool frameRegister::runnable;
 myROI* frameRegister::roi;
 float frameRegister::heuristicSearchBound=.3;
-const float frameRegister::epsilon=1e-5F;
+const float frameRegister::epsilon=1e-6F;
 // NOTE: Skip last 2 frames as they take longest to decode
 frameRegister::frameRegister(const char* cap_str[2], const int& prange, const
 	DiffMethod& me, const VideoDFT::Transform& tr, const Criterion& parm,
@@ -509,29 +486,33 @@ const int frameRegister::reg(const int& pos, const int& prev_reg, const DiffMeth
 	   if(dropArray[cnt])--endpos;
    }
    count = endpos-startpos+1;
-   memset(diffVal, 0, sizeof(float)*(range*2+1));
-   memset(diffPos, 0, sizeof(int)*(range*2+1));
    startpos =static_cast<int>(cvGetCaptureProperty(src_cap,
 		CV_CAP_PROP_POS_FRAMES));
    cvSetCaptureProperty(src_cap, CV_CAP_PROP_POS_FRAMES, pos);
    frame1=cvQueryFrame(src_cap);
    if(!runnable){
 	cvSetCaptureProperty(dest_cap, CV_CAP_PROP_POS_FRAMES, startpos);
-	frame2=cvQueryFrame(dest_cap);
 	for(int cpos=startpos; cpos<=endpos; ++cpos){
-	   if((diffVal[cpos-startpos]=calcDiff(frame1,frame2))<frameRegister::epsilon
+	   if((diffVal[cpos-startpos]=calcDiff(frame1,cvQueryFrame(dest_cap)))<frameRegister::epsilon
 		   && !inc)return cpos+1;
 	   diffPos[cpos-startpos] = cpos;
-	   frame2=cvQueryFrame(dest_cap);
 	}
    }else{
 	pmt->dispatch();
-	while(pmt->idle());  // wait for all threads
+	int cpos;
+	for(cvSetCaptureProperty(dest_cap,CV_CAP_PROP_POS_FRAMES,cpos=startpos+pmt->mbeg());
+		pmt->get_sc()==-1 && cpos<=endpos && !diffVal[cpos-startpos];
+		++cpos){  /* master's bidding */
+	   if((diffVal[cpos-startpos]=calcDiff(frame1,cvQueryFrame(dest_cap)))
+		   <frameRegister::epsilon && !inc)return pmt->get_sc()=cpos+1; /* idle slaves */
+	   diffPos[cpos-startpos] = cpos;
+	}
+	while(pmt->busy());  // wait for slave threads
 	if(pmt->get_sc()>=0 && !inc)return pmt->get_sc()+1;
    }
    prev_srcPos = pos;
    float diffSort[count];
-   memcpy(diffSort, diffVal, count*sizeof(float));
+   memcpy(diffSort,diffVal,sizeof diffSort);
    std::nth_element(diffSort, diffSort+static_cast<int>(heuristicSearchBound*count),
 	   diffSort+count);
    float threshold = diffSort[static_cast<int>(heuristicSearchBound*count)];
@@ -550,7 +531,6 @@ const int frameRegister::reg(const int& pos, const int& prev_reg, const DiffMeth
 	   if(diffVal[regtmp-startpos]<=threshold && regtmp<regpos){
 		regpos=regtmp; break;
 	   }
-// 	printf("%d finished\n",startpos);
    }
    if(::verbose)dump();
 //    dump();
@@ -666,7 +646,7 @@ Logger::Logger(const char* log, VideoProp*vp[2], ARMA_Array<float>* ma[3], Hist&
 }
 
 void Logger::update(){
-   fprintf(file.fd,"%d\t%d\t", vp1->prop.posFrame, vp2->prop.posFrame);   // frame pos
+   fprintf(file.fd,"%d\t%d\t", vp1->prop.posFrame-1, vp2->prop.posFrame);   // frame pos
    double ff[]={dyn1->get_val(), dyn2->get_val(), diff->get_val(), histDiff.diff(Correlation),
 	histDiff.diff(Chi_square), histDiff.diff(Intersection), histDiff.diff(Bhattacharyya),
    dftDiff->diff(Correlation), dftDiff->diff(Intersection), dftDiff->diff(Bhattacharyya)};
